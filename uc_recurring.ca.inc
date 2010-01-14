@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.ca.inc,v 1.1.2.3 2009/10/13 04:51:48 univate Exp $
+// $Id: uc_recurring.ca.inc,v 1.1.2.4 2010/01/14 14:41:44 univate Exp $
 
 /**
  * @file
@@ -284,6 +284,15 @@ function uc_recurring_ca_trigger() {
 
   $triggers['uc_recurring_renewal_failed'] = array(
     '#title' => t('Recurring order renewal failed'),
+    '#category' => t('Recurring Fees'),
+    '#arguments' => array(
+      'order' => $order,
+      'recurring_fee' => $recurring_fee,
+    ),
+  );
+
+  $triggers['uc_recurring_cancel'] = array(
+    '#title' => t('Recurring order cancelled'),
     '#category' => t('Recurring Fees'),
     '#arguments' => array(
       'order' => $order,

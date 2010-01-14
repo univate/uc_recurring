@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.module,v 1.1.4.69 2010/01/08 05:59:55 univate Exp $
+// $Id: uc_recurring.module,v 1.1.4.70 2010/01/14 14:41:44 univate Exp $
 
 /**
  * @file
@@ -959,6 +959,9 @@ function uc_recurring_fee_cancel($rfid, $fee = NULL) {
 
   // Let other modules act on the canceled fee.
   module_invoke_all('uc_recurring_cancel', $fee);
+
+  $order = uc_order_load($fee->order_id);
+  ca_pull_trigger('uc_recurring_cancel', $order, $fee);
 }
 
 /**
