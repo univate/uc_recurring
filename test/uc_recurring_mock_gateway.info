@@ -1,0 +1,8 @@
+; $Id: uc_recurring_mock_gateway.info,v 1.1.2.1 2009/09/03 05:00:09 univate Exp $
+name = Mock Recurring Gateway
+description = Implements mock payment method functions to simulate payment processing functions in uc_recurring.
+dependencies[] = uc_payment
+package = Ubercart - payment
+hidden = TRUE
+core = 6.x
+php = 5.0

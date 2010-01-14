@@ -1,0 +1,10 @@
+/* $Id */
+
+.interval-fieldset {
+  float: left;
+  width: 40%;
+  margin-right: 1%;
+}
+.interval-fieldset div.form-item {
+  display: inline;
+}

@@ -1,0 +1,561 @@
+<?php
+// $Id: uc_recurring.test,v 1.1.2.5 2009/12/31 01:46:04 univate Exp $
+
+/**
+ * @file
+ * UC Recurring simpletest
+ */
+
+class ucRecurringTestCase extends UbercartTestCase {
+
+  /**
+   * Add a recurring feature to a product.
+   */
+  function createRecurringFeature($nid, $feature = array()) {
+    $interval_units = array('days', 'months', 'years');
+
+    $defaults = array(
+      'model' => '',
+      'fee_same_product' => FALSE,
+      'fee_amount' => rand(1, 999),
+      'initial_charge_value' => rand(1, 10),
+      'initial_charge_unit' => $interval_units[rand(0, 2)],
+      'regular_interval_value' => rand(1, 10),
+      'regular_interval_unit' => $interval_units[rand(0, 2)],
+      'unlimited_intervals' => FALSE,
+      'number_intervals' => rand(3, 10),
+    );
+
+    $feature = array_merge($defaults, $feature);
+    $this->drupalPost('node/'. $nid .'/edit/features/recurring/add', $feature, t('Save feature'));
+    $this->assertRaw(t('The product feature has been added.'), t('"The product feature has been added." was displayed on the edit features page'));
+
+    return $feature;
+  }
+
+  /**
+   * Create users with recurring permissions.
+   */
+  function createRecurringUsers() {
+    // Create a store administrator user account.
+    $this->user_recurring_admin = $this->drupalCreateUser(array(
+      'administer conditional actions',
+      'administer order workflow',
+      'create orders',
+      'delete orders',
+      'edit orders',
+      'view all orders',
+      'administer product classes',
+      'administer product features',
+      'administer products',
+      'create products',
+      'delete all products',
+      'edit all products',
+      'administer store',
+      'view customers',
+      'view store reports',
+      'administer recurring fees',
+    ));
+    $this->user_recurring_customer = $this->drupalCreateUser(array(
+      'view own orders',
+      'view own recurring fees'
+    ));
+  }
+
+  /**
+   * Returns the last order_id added in the database.
+   */
+  function lastCreatedOrderId() {
+    if ($result = db_query('SELECT max(order_id) FROM {uc_orders}')) {
+      return db_result($result);
+    }
+    return -1;
+  }
+
+  /**
+   * place an order for a product with a recurring fee.
+   */
+  function placeOrderWithRecurringFee($product) {
+    $last_order_id = $this->lastCreatedOrderId();
+
+    // create an order
+    $this->drupalPost('node/'. $product->nid, array(), t('Add to cart'));
+    $this->assertRaw($product->title, t('The product name has been displayed on the cart page.'));
+    $this->assertRaw('added to', t('The product name has been displayed on the cart page.'));
+    $this->checkout(array('panes[delivery][delivery_postal_code]' => '12345', 'panes[billing][billing_postal_code]' => '12345'));
+    $this->assertRaw('Your order is complete!', t('"Your order is complete!" appears on the thank you page.'));
+    $order_id = $this->lastCreatedOrderId();
+    if ($order_id > $last_order_id) {
+      return $order_id;
+    }
+    return FALSE;
+  }
+
+  /**
+   * Get a single recurring fee from the order ID.
+   */
+  function getSingleRecurringFeeFromOrder($order_id) {
+    $order = uc_order_load($order_id);
+    $fees = uc_recurring_get_fees($order);
+    $this->assertEqual(count($fees), 1, t('Found 1 recurring fee.'));
+
+    return array_shift($fees);
+  }
+
+  /**
+   * Process a recurring fee.
+   */
+  function processRecurringFee($rfid, $times_to_renew) {
+    $old_fee = uc_recurring_fee_user_load($rfid);
+    $current_order_id = empty($old_fee->data['recurring orders']) ? $old_fee->order_id : max($old_fee->data['recurring orders']);
+
+    // Simulate the order being ready for renewal by changing the "next_charge"
+    // field.
+    db_query("UPDATE {uc_recurring_users} SET next_charge=%d WHERE rfid=%d", time()-1, $rfid);
+    // Run cron function.
+    uc_recurring_cron();
+
+    $new_order_id = $this->lastCreatedOrderId();
+
+    if ($old_fee->remaining_intervals == 0) {
+      // There should be no new order.
+      $this->pass(t('Recurring Fee %rfid has expired', array('%rfid' => $rfid)));
+      $this->assertEqual($current_order_id, $new_order_id, t('No new order created.'));
+    }
+    else {
+      $this->pass(t('Order %order_id has been created', array('%order_id' => $new_order_id)));
+
+      $fee = uc_recurring_fee_user_load($rfid);
+      $this->assertEqual($new_order_id, $current_order_id+1, t('New recurring order created.'));
+
+      $this->assertEqual($fee->charged_intervals, $old_fee->charged_intervals+1, t('Number of intervals been charged is now: %charged.', array('%charged' => $fee->charged_intervals)));
+
+      // Negative intervals means unlimited renewals.
+      if ($old_fee->remaining_intervals < 0) {
+        $this->assertEqual($fee->remaining_intervals, -1, t('Still has unlimited intervals remaining.'));
+      }
+      else {
+        $this->assertEqual($fee->remaining_intervals, $old_fee->remaining_intervals-1, t('%remaining_intervals remaining interval.', array('%remaining_intervals' => $fee->remaining_intervals)));
+
+      }
+
+      if ($times_to_renew > 1) {
+        return $this->processRecurringFee($rfid, $times_to_renew-1);
+      }
+    }
+  }
+}
+
+/**
+ * Test the recurring API.
+ */
+class ucRecurringAPITestCase extends ucRecurringTestCase {
+  public static function getInfo() {
+    return array(
+      'name' => t('API functions'),
+      'description' => t('Setup recurring product and test the actions that can occur on a recurring payment.'),
+      'group' => t('Ubercart recurring fees'),
+    );
+  }
+
+  function setUp() {
+    parent::setUp('uc_recurring');
+
+    $this->createRecurringUsers();
+  }
+
+  /**
+   * Test customer functions of purchasing an order with recurring product.
+   */
+  function testRecurringOrders() {
+    $this->drupalLogin($this->user_recurring_admin);
+    // create two products with recurring features
+    $product1 = $this->createProduct();
+    $p1_recurring_feature = $this->createRecurringFeature($product1->nid, array('unlimited_intervals' => TRUE));
+    $product2 = $this->createProduct();
+    $p2_recurring_feature = $this->createRecurringFeature($product2->nid);
+    $this->drupalLogout();
+
+    // test logging in as an authenticated user
+    // purchasing an order with a unlimited recurring fee
+    // navigating to
+    $this->pass(t('Testing authenticated checkout.'));
+    $this->drupalLogin($this->user_recurring_customer);
+    $order_id = $this->placeOrderWithRecurringFee($product1);
+    if ($order_id) {
+      $this->assertRaw('Your order is complete! Your order number is '. $order_id .'.', t('The order id displayed on complete page'));
+
+      // test that as a user can navigate around their account and view the order and recurring fee details
+      $this->clickLink(t('My account'));
+      $this->clickLink(t('Click here to view your recurring fees'));
+      $this->clickLink(t('!order_id', array('!order_id' => $order_id)));
+      $this->assertRaw('Order '. $order_id, t('Viewing Order in the users account'));
+
+      $fee = $this->getSingleRecurringFeeFromOrder($order_id);
+      $this->processRecurringFee($fee->rfid, 2);
+
+      // cancel order
+      $this->drupalGet('user');
+      $this->clickLink(t('Click here to view your recurring fees'));
+      $this->clickLink(t('cancel'));
+      $this->drupalPost(NULL, array(), t('Yes, I want to cancel the subscription'));
+      $fee = uc_recurring_fee_user_load($fee->rfid);
+      $this->assertEqual($fee->remaining_intervals, 0, t('Recurring order !order_id canceled', array('!order_id' => $order_id)));
+
+      // attempt to renew
+      $last_order_id = $this->lastCreatedOrderId();
+      $this->processRecurringFee($fee->rfid, 1);
+      $this->assertEqual($last_order_id, $this->lastCreatedOrderId(), t('Order did not renew after canceled.'));
+    }
+    $this->drupalLogout();
+
+    $this->pass(t('Testing anonymous checkout.'));
+    $order_id = $this->placeOrderWithRecurringFee($product2);
+    if ($order_id) {
+      $this->pass(t('Order %order_id has been created', array('%order_id' => $order_id)));
+
+      $fee = $this->getSingleRecurringFeeFromOrder($order_id);
+      $this->processRecurringFee($fee->rfid, $p1_recurring_feature['number_intervals']+1);
+      // attempt to renew
+      $last_order_id = $this->lastCreatedOrderId();
+      $this->processRecurringFee($fee->rfid, 1);
+      $this->assertEqual($last_order_id, $this->lastCreatedOrderId(), t('Order did not renew after canceled.'));
+    }
+  }
+
+  /**
+   * Test administrator functions.
+   */
+  function testRecurringAdminFunctions() {
+    $this->drupalLogin($this->user_recurring_admin);
+
+    $this->drupalGet('admin/store/orders/recurring');
+    // TODO: check admin settings form
+
+    // create two products with recurring features
+    $product = $this->createProduct();
+    $recurring_feature = $this->createRecurringFeature($product->nid);
+    $this->drupalLogout();
+
+    // create an order
+    $order_id = $this->placeOrderWithRecurringFee($product);
+    if ($order_id) {
+      $order = uc_order_load($order_id);
+      $fees = uc_recurring_get_fees($order);
+      $fee = $fees[0];
+
+      $this->drupalLogin($this->user_recurring_admin);
+
+      // charge fee
+      $this->drupalGet('admin/store/orders/recurring');
+      $this->clickLink(t('charge'));
+      $this->drupalPost(NULL, array(), t('Process Renewal'));
+
+      $this->assertEqual($order_id+1, $this->lastCreatedOrderId(), t('Order renewed after canceled.'));
+
+      // edit fee
+      $this->drupalGet('admin/store/orders/recurring');
+      $this->clickLink(t('edit'));
+      // TODO: check we can edit fields and that they are updated in db
+
+      // cancel fee
+      $this->drupalGet('admin/store/orders/recurring');
+      $this->clickLink(t('cancel'));
+      $this->drupalPost(NULL, array(), t('Yes, I want to cancel the subscription'));
+
+      // attempt to renew
+      $last_order_id = $this->lastCreatedOrderId();
+      $this->processRecurringFee($fee->rfid, 1);
+      $this->assertEqual($last_order_id, $this->lastCreatedOrderId(), t('Order did not renew after canceled.'));
+
+      $this->drupalLogout();
+    }
+  }
+}
+
+/**
+ * Test payment gateway API functions in uc_recurring.
+ */
+class ucRecurringIntegrationTestCase extends ucRecurringTestCase {
+  public static function getInfo() {
+    return array(
+      'name' => t('Payment integration'),
+      'description' => t('Test the API functionality to trigger recurring payments via a third party module.'),
+      'group' => t('Ubercart recurring fees'),
+    );
+  }
+
+  function setUp() {
+    parent::setUp('uc_recurring', 'uc_payment', 'uc_recurring_mock_gateway');
+
+    $this->createRecurringUsers();
+  }
+
+  /**
+   * place an order with the mock gateway payment module
+   */
+  function testRecurringPaymentIntegration() {
+    $this->drupalLogin($this->user_recurring_admin);
+
+    $checkoutMessage = $this->randomName(20);
+
+    // select mock gateway for payments
+    $settings = array(
+      'uc_recurring_payment_methods[mock_gateway]' => TRUE,
+      'uc_recurring_checkout_message' => $checkoutMessage,
+    );
+    $this->drupalPost('admin/store/settings/products/edit/features', $settings, t('Save configuration'));
+
+    // create products with recurring features
+    $product = $this->createProduct();
+    $recurring_feature = $this->createRecurringFeature($product->nid, array('unlimited_intervals' => TRUE));
+    $this->drupalLogout();
+
+    $order_id = $this->placeOrderWithRecurringFee($product);
+    if ($order_id) {
+      $fee = $this->getSingleRecurringFeeFromOrder($order_id);
+
+      $order = uc_order_load($order_id);
+      $this->assertEqual('completed', $order->order_status, t('Payment Received for order.'));
+
+      // test renewal on successful payment processing
+      $this->processRecurringFee($fee->rfid, 1);
+      $order = uc_order_load($this->lastCreatedOrderId());
+      $this->assertEqual('payment_received', $order->order_status, t('payment processed'));
+
+      // order should now be completed
+
+      // test renewal on failed payment processing
+      global $gateway_status;
+      $gateway_status = FALSE;
+      $current_order_id = $this->lastCreatedOrderId();
+      $this->processRecurringFee($fee->rfid, 1);
+      $order = uc_order_load($this->lastCreatedOrderId());
+      $this->assertEqual($order->order_id, $current_order_id, t('no new order created on failed payment'));
+    }
+  }
+}
+
+/**
+ * Test payment gateway api fuctions in uc_recurring.
+ */
+class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
+  public static function getInfo() {
+    return array(
+      'name' => t('Paypal WPS'),
+      'description' => t('Test the paypal IPN callback on recurring orders'),
+      'group' => t('Ubercart recurring fees'),
+    );
+  }
+
+  function setUp() {
+    parent::setUp('uc_recurring', 'uc_payment', 'uc_paypal', 'uc_recurring_hosted');
+
+    $this->createRecurringUsers();
+  }
+
+  /**
+   *  Place an order with the Paypal WPS gateway.
+   */
+  function testRecurringPaypal() {
+    module_load_include('inc', 'uc_recurring_hosted', 'uc_recurring_hosted.paypal_ipn');
+
+    $this->drupalLogin($this->user_recurring_admin);
+
+    $settings = array('uc_payment_method_paypal_wps_checkout' => TRUE, 'uc_paypal_wps_email' => 'paypal@example.com');
+    $this->drupalPost('admin/store/settings/payment/edit/methods', $settings, t('Save configuration'));
+
+    // Select mock gateway for payments.
+    $settings = array('uc_recurring_payment_methods[paypal_wps]' => TRUE);
+    $this->drupalPost('admin/store/settings/products/edit/features', $settings, t('Save configuration'));
+
+    // Create products with recurring features.
+    $product = $this->createProduct(array('sell_price' => 20.00));
+    $recurring_feature = $this->createRecurringFeature($product->nid, array('unlimited_intervals' => TRUE, 'fee_amount' => 50));
+    $this->drupalLogout();
+
+    variable_set('uc_paypal_wps_server', url('uc_recurring_hosted/paypal/cgi-bin/webscr', array('absolute' => TRUE)));
+    variable_set('uc_paypal_wps_checkout_button', t('Submit order'));
+
+    $this->drupalPost('node/'.$product->nid, array(), t('Add to cart'));
+    $this->assertRaw($product->title, t('The product name has been displayed on the cart page.'));
+    $this->assertRaw('added to', t('The product name has been displayed on the cart page.'));
+    $this->checkout(array('panes[delivery][delivery_postal_code]' => '12345', 'panes[billing][billing_postal_code]' => '12345'));
+    $order_id = $this->lastCreatedOrderId();
+    $this->assertEqual($order_id, 1, t('First order created.'));
+
+    // The ipn is expecting all the variables to be in the $_POST variable.
+    global $_POST;
+    $_POST = $this->_uc_recurring_paypal_messages('subscr_signup', $order_id);
+    uc_recurring_hosted_paypal_ipn($order_id);
+    $order = uc_order_load($order_id);
+    $this->verbose(print_r($order, TRUE));
+
+    $_POST = $this->_uc_recurring_paypal_messages('subscr_payment', $order_id, 20);
+    uc_recurring_hosted_paypal_ipn($order_id);
+    $new_order_id = $this->lastCreatedOrderId();
+    $order = uc_order_load($new_order_id);
+    $this->verbose(print_r($order, TRUE));
+
+    $this->assertEqual('payment_received', $order->order_status, t('Order @order_id payment processed', array('@order_id' => $new_order_id)));
+
+    // Renew order.
+    $_POST = $this->_uc_recurring_paypal_messages('subscr_payment', $order_id, 50);
+    uc_recurring_hosted_paypal_ipn($order_id);
+    $new_order_id = $this->lastCreatedOrderId();
+    $order = uc_order_load($new_order_id);
+    $this->assertEqual('payment_received', $order->order_status, t('Order @order_id payment processed', array('@order_id' => $new_order_id)));
+    $this->assertEqual($order_id+1, $new_order_id, t('New order created for renewal'));
+
+    // Handle failed payment.
+    $_POST = $this->_uc_recurring_paypal_messages('subscr_failed', $order_id, 50);
+    uc_recurring_hosted_paypal_ipn($order_id);
+    $order = uc_order_load($new_order_id);
+    $this->assertEqual($order_id, $new_order_id, t('No new order created for failed payment.'));
+
+    // Handle cancellation.
+    $_POST = $this->_uc_recurring_paypal_messages('subscr_cancel', $order_id, 50);
+    uc_recurring_hosted_paypal_ipn($order_id);
+    $order = uc_order_load($new_order_id);
+    $this->assertEqual($order_id, $new_order_id, t('No new order created for cancelled order.'));
+  }
+
+  /**
+   * Mock return values from paypal
+   */
+  function _uc_recurring_paypal_messages($msg_type, $order_id, $amount = 0) { 
+    $subscr_id = 'S-36L13190CF840735L';
+    $lastname = 'lastname';
+    $firstname = 'firstname';
+    $payer_email = 'email@example.com';
+    $order_title = 'Order '. $order_id;
+    $site_email = 'site@example.com';
+    $messages = array(
+      'subscr_signup' => array(
+        'txn_type' => 'subscr_signup',
+        'subscr_id' => $subscr_id,
+        'last_name' => $lastname,
+        'residence_country' => 'AU',
+        'mc_currency' => 'USD',
+        'item_name' => $order_title,
+        'business' => $site_email,
+        'amount1' => '20.00',
+        'amount3' => '50.00',
+        'recurring' => '1',
+        'verify_sign' => 'AD64hcmiT1x99QnLF9FyFJZ8tiTHAkx9HelO6oUjwyK4tjmKRIrCWgjd',
+        'payer_status' => 'unverified',
+        'payer_email' => $payer_email,
+        'first_name' => $firstname,
+        'receiver_email' => $site_email,
+        'payer_id' => '76VZLCDJFJF34',
+        'invoice' => $order_id .'-QKO',
+        'reattempt' => '1',
+        'subscr_date' => '06:04:49 Aug 31, 2009 PDT',
+        'charset' => 'windows-1252',
+        'notify_version' => '2.8',
+        'period1' => '7 D',
+        'mc_amount1' => '20.00',
+        'period3' => '1 M',
+        'mc_amount3' => '50.00',
+      ),
+      'subscr_payment' => array(
+        'transaction_subject' => '',
+        'payment_date' => '04:23:25 Aug 30, 2009 PDT',
+        'txn_type' => 'subscr_payment',
+        'subscr_id' => $subscr_id,
+        'last_name' => $lastname,
+        'residence_country' => 'AU',
+        'item_name' => $order_title,
+        'payment_gross' => sprintf("0.2f", $amount),
+        'mc_currency' => 'USD',
+        'business' => $site_email,
+        'payment_type' => 'instant',
+        'protection_eligibility' => 'Ineligible',
+        'verify_sign' => 'ADcTLhZXAOjhiy0C89yIcZ88CzBWADhlrLg1DyMqv-xDus-qyJrrmsvo',
+        'payer_status' => 'unverified',
+        'payer_email' => $payer_email,
+        'txn_id' => '58H79324DK124573U',
+        'receiver_email' => $site_email,
+        'first_name' => $firstname,
+        'invoice' => $order_id .'-EPK',
+        'payer_id' => '6XGCGCPH8W534',
+        'receiver_id' => 'GWA2A76YCPXVQ',
+        'payment_status' => 'Completed',
+        'payment_fee' => '2.63',
+        'mc_fee' => '2.63',
+        'mc_gross' => sprintf("0.2f", $amount),
+        'charset' => 'windows-1252',
+        'notify_version' => '2.8',
+      ),
+      'subscr_failed' => array(
+        'txn_type' => 'subscr_failed',
+        'subscr_id' => $subscr_id, 
+        'last_name' => $lastname,
+        'residence_country' => 'AU',
+        'item_name' => $order_title,
+        'payment_gross' => '50.00',
+        'mc_currency' => 'USD',
+        'business' => $site_email,
+        'verify_sign' => 'Ac1LtbexNvR-7fVEm2Hr8nwAP9nwASZ078vAUAidKZpOaZ8.lZAgmMk4',
+        'payer_status' => 'verified',
+        'payer_email' => $payer_email,
+        'first_name' => $firstname,
+        'receiver_email' => $site_email,
+        'payer_id' => 'WAKK3E8Z9J3E',
+        'invoice' => $order_id .'-BDK',
+        'retry_at' => '06:21:12 Sep 02, 2009 PDT',
+        'payer_business_name' => 'Business',
+        'mc_gross' => '50.00',
+        'charset' => 'windows-1252',
+        'notify_version' => '2.8',
+      ),
+      'subscr_cancel' => array(
+        'txn_type' => 'subscr_cancel',
+        'subscr_id' => $subscr_id,
+        'last_name' => $lastname,
+        'residence_country' => 'AU',
+        'mc_currency' => 'USD',
+        'item_name' => $order_title,
+        'amount1' => '20.00',
+        'business' => $site_email,
+        'amount3' => '50.00',
+        'recurring' => '1',
+        'verify_sign' => 'AFcWxV21C7fd0v3bYYYRCpSSRl31ARFS9PJtnu4RIGItZ5.Ob4xzwvYZ',
+        'payer_status' => 'verified',
+        'payer_email' => $payer_email,
+        'first_name' => $firstname,
+        'receiver_email' => $site_email,
+        'payer_id' => 'WAKK3E8Z9J3EE',
+        'invoice' => $order_id .'-BDK',
+        'reattempt' => '1',
+        'payer_business_name' => 'Business',
+        'subscr_date' => '11:50:37 Sep 02, 2009 PDT',
+        'charset' => 'windows-1252',
+        'notify_version' => '2.8',
+        'period1' => '7 D',
+        'mc_amount1' => '20.00',
+        'period3' => '1 M',
+        'mc_amount3' => '50.00',
+      ),
+      'subscr_eot' => array(
+        'txn_type' => 'subscr_eot',
+        'subscr_id' => $subscr_id,
+        'last_name' => $lastname,
+        'residence_country' => 'AU',
+        'item_name' => $order_title,
+        'mc_currency' => 'USD',
+        'business' => $site_email,
+        'verify_sign' => 'AdQt9JQnh.MOM7Fe6O8DQY7ve6g3ATrYHEG3jPMHBdHlDnTBZeEEQKDR',
+        'payer_status' => 'verified',
+        'payer_email' => $payer_email,
+        'first_name' => $firstname,
+        'receiver_email' => $site_email,
+        'payer_id' => 'SJKZMSLWS4J54',
+        'invoice' => $order_id .'-MSX',
+        'charset' => 'windows-1252',
+        'notify_version' => '2.8',
+      ),
+    );
+    return $messages[$msg_type];
+  }
+}
