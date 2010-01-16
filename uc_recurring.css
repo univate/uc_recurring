@@ -1,10 +1,16 @@
 /* $Id */
 
-.interval-fieldset {
+fieldset.interval-fieldset,
+div.fieldset.interval-fieldset {
   float: left;
   width: 40%;
   margin-right: 1%;
 }
 .interval-fieldset div.form-item {
   display: inline;
+  float: left;
+}
+
+#edit-reset-next-charge-wrapper {
+  clear: both;
 }
