@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.module,v 1.1.4.70 2010/01/14 14:41:44 univate Exp $
+// $Id: uc_recurring.module,v 1.1.4.71 2010/01/22 21:11:03 univate Exp $
 
 /**
  * @file
@@ -339,7 +339,7 @@ function uc_recurring_token_values($type, $object = NULL) {
       $values['charged-intervals'] = $fee->charged_intervals;
       $values['remaining-intervals'] = $fee->remaining_intervals < 0 ? t('Until cancelled') : $fee->remaining_intervals;
       $values['renewal-attempts'] = $fee->attempts;
-      $values['recurring-link'] = url('user/'. $fee->uid .'recurring-fees', array('absolute' => TRUE));
+      $values['recurring-link'] = url('user/'. $fee->uid .'/recurring-fees', array('absolute' => TRUE));
       break;
   }
 
