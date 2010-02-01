@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.admin.inc,v 1.1.4.11 2010/01/16 11:59:39 univate Exp $
+// $Id: uc_recurring.admin.inc,v 1.1.4.12 2010/01/28 21:41:21 univate Exp $
 
 /**
  * @file
@@ -236,7 +236,7 @@ function uc_recurring_admin_edit_form($form_state, $rfid, $fee_handler) {
       $form['next_charge']['next_charge_date'] = array(
         '#type' => 'date',
         '#title' => t('Date'),
-        '#default_value' => array('year' => date('Y', $fee->next_charge), 'month' => date('m', $fee->next_charge), 'day' => date('d', $fee->next_charge)),
+        '#default_value' => array('year' => date('Y', $fee->next_charge), 'month' => date('n', $fee->next_charge), 'day' => date('j', $fee->next_charge)),
       );
     }
   
