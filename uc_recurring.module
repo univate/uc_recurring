@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.module,v 1.1.4.71 2010/01/22 21:11:03 univate Exp $
+// $Id: uc_recurring.module,v 1.1.4.72 2010/02/01 05:35:42 univate Exp $
 
 /**
  * @file
@@ -904,7 +904,7 @@ function uc_recurring_fee_user_load($rfid) {
     $fee->data = unserialize($fee->data);
 
     // Allow other modules to change the saved data.
-    drupal_alter('recurring_fee_product_load', $product);
+    drupal_alter('recurring_fee_user_load', $product);
     return $fee;
   }
   return FALSE;
