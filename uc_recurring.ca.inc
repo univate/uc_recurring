@@ -229,7 +229,7 @@ function uc_recurring_ca_condition() {
     '#category' => t('Order: Recurring'),
     '#callback' => 'uc_recurring_condition_order_has_expired',
     '#arguments' => array(
-      'order' => array('#entity' => 'uc_recurring_fee', '#title' => t('Recurring Fee')),
+      'recurring_fee' => array('#entity' => 'uc_recurring_fee', '#title' => t('Recurring Fee')),
     ),
   );
 
