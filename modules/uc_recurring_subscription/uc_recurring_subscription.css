@@ -1,0 +1,30 @@
+
+form#uc-recurring-subscription-ui-product-form div.subscription-interval-value {
+  float: left;
+  padding: 0 0 0 20px;
+  text-align: right;
+}
+
+form#uc-recurring-subscription-ui-product-form div.subscripion-interval-period {
+  float: left;
+  padding: 1.6em 20px 0 0;
+}
+
+form#uc-recurring-subscription-ui-product-form div.subscription-amount {
+  float: left;
+  padding: 0 20px;
+}
+
+form#uc-recurring-subscription-ui-product-form div.subscription-num-intervals {
+  float: left;
+  padding: 0 0 0 20px;
+}
+
+form#uc-recurring-subscription-ui-product-form div.subscription-unlimited-intervals {
+ float: left;
+ padding: 1.8em 0 0;
+}
+
+#edit-notication-event-wrapper label {
+  display: inline;
+}

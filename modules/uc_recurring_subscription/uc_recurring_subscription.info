@@ -1,0 +1,8 @@
+; $Id:$
+name = Subscription Manager
+description = Implements a simple unified UI for managing recurring subscription products.
+dependencies[] = uc_recurring
+dependencies[] = uc_attribute
+package = Ubercart - Recurring
+core = 6.x
+php = 5.0

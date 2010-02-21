@@ -2,6 +2,6 @@
 name = Recurring Fees
 description = Assign recurring fees to products and manage them. Should be used with a payment service that implements a recurring fee handler.
 dependencies[] = ca
-package = Ubercart - payment
+package = Ubercart - recurring
 core = 6.x
 php = 5.0
