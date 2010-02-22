@@ -76,8 +76,7 @@ function uc_recurring_subscription_ca_trigger() {
 function uc_recurring_subscription_ca_predicate() {
   $predicates = array();
 
-  // Set the order status to "Completed" when checkout is complete, none
-  // of the products are shippable, and the balance is less than or equal to 0.
+  // Grant user roles to user when checkout is complete.
   $predicates['uc_recurring_subscription_grant_roles'] = array(
     '#title' => t('Update users roles on renewal processed'),
     '#trigger' => 'uc_recurring_renewal_complete',
@@ -137,49 +136,33 @@ function uc_recurring_subscription_condition_event_type($event, $settings) {
 }
 
 /**
- *
- */
-function uc_recurring_subscription_condition_event_type_form($form_state, $settings = array()) {
-  $form['event'] = array(
-    '#type' => 'checkboxes',
-    '#title' => t('Event types'),
-    '#options' => array(
-      'activated' => 'Subscription activated',
-      'recurring' => 'Subscription renewed',
-      'blocked' => 'Subscription blocked',
-      'unblocked' => 'Subscription unblocked',
-      //'ended' => 'Subscription ended',
-      'terminated' => 'Subscription terminated',
-    ),
-    '#default_value' => is_array($settings['event']) ? $settings['event'] : array(),
-  );
-
-  return $form;
-}
-
-/**
  * Grant a role.
  */
 function uc_recurring_subscription_action_grant_role($order, $subscription, $settings) {
-  if ($settings 
-  $rid = $settings['role'];
+  $account = user_load($order->uid);
+  
   $roles = user_roles(TRUE);
-
-  if ($roles[$rid]) {
-    $account = user_load($order->uid);
+  if ($settings['role_option'] == 'custom') { 
+    $rid = $settings['role'];
     $account->roles += array($rid => $roles[$rid]);
-    user_save($account, array('roles' => $account->roles));
     watchdog('uc_recurring', 'Granted !role role to !user', array('!role' => $roles[$rid], '!user' => $account->name));
+  } 
+  else {
+    $account->roles += $subscription->roles;
   }
+  user_save($account, array('roles' => $account->roles));
 }
 
+/**
+ *
+ */
 function uc_recurring_subscription_action_grant_role_form($form_state, $settings = array()) {
   $form['role_option'] = array(
     '#type' => 'select',
     '#title' => 'Select role from',
     '#options' => array(
-      'custom' => 'Custom Role',
-      'subscription' => 'Subscription Settings',
+      'custom' => 'Custom selected role',
+      'order' => 'From order',
     )
   );
 

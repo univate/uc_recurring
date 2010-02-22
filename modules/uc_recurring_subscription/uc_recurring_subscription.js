@@ -2,12 +2,6 @@
  * Disable and enable fields in the recurring subscription form.
  */
 Drupal.behaviors.UcRecurringSubscriptionForm = function (context) {
-  // Toggle the fee amount field according to "Set the recurring fee amount as
-  // Selling price field state.
-  $("#recurring_intervals input.form-submit").click(function() {
-    $(this).parent().remove();
-  });
-
   $(".unlimited-checkbox").change(function() {
     var id = $(this).attr('id');
     text_id = id.replace('unlimited', 'number-intervals');

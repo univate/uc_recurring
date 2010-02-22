@@ -7,6 +7,13 @@
  */
 
 /**
+ * Implementation of hook_init().
+ */
+function uc_recurring_subscription_init() {
+  module_load_include('inc', 'uc_recurring_subscription', 'uc_recurring_subscription.ca');
+}
+
+/**
  * Implementation of hook_perm().
  */
 function uc_recurring_subscription_perm() {
@@ -22,7 +29,8 @@ function uc_recurring_subscription_menu() {
   $items['admin/store/subscriptions'] = array(
     'title' => 'Subscription Manager',
     'description' => 'Manage recurring subscription products.',
-    'page callback' => 'uc_recurring_subscription_overview',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('uc_recurring_subscription_overview'),
     'access arguments' => array('manage subscriptions'),
     'type' => MENU_NORMAL_ITEM,
     'file' => 'uc_recurring_subscription.admin.inc',
@@ -137,3 +145,129 @@ function _uc_recurring_subscription_product_feature($product_id) {
   }
   return $products;
 }
+
+/**
+ * Implementation of hook_theme()
+ */
+function uc_recurring_subscription_theme() {
+  return array(
+    'uc_recurring_subscription_item' => array(
+      'arguments' => array('form' => NULL),
+    ),
+    'uc_recurring_subscription_products' => array(
+      'arguments' => array('form' => NULL),
+    ),
+  );
+}
+
+/**
+ *
+ */
+function _uc_recurring_subscription_create_attribute_option($value, $interval) {
+  if ($value == 1) {
+    switch ($interval) {
+      case 'days':
+        return t('Daily');
+      case 'weeks':
+        return t('Weekly');
+      case 'months':
+        return t('Monthly');
+      case 'year':
+        return t('Yearly');
+    }
+  }
+
+  return t('Every @value @interval', array('@value' => $value, '@interval' => $interval));
+}
+
+/**
+ *
+ */
+function _uc_recurring_subscription_attribute_option_by_name($aid, $name) {
+  $option = db_fetch_object(db_query("SELECT * from {uc_attribute_options} WHERE aid = %d AND name = '%s'", $aid, $name));
+  return $option;
+}
+
+
+
+// Attribute functions
+if (!function_exists('uc_attribute_save')) {
+  /**
+   * Save an attribute object to the database.
+   * 
+   * @param $attribute
+   *   The attribute object to save.
+   * @return (integer)
+   *   Return the result from drupal_write_record().
+   */
+  function uc_attribute_save(&$attribute) {
+    // Insert or update?
+    $key = empty($attribute->aid) ? NULL : 'aid';
+    return drupal_write_record('uc_attributes', $attribute, $key);
+  }
+}
+
+if (!function_exists('uc_attribute_delete')) {
+  /**
+   * Delete an attribute from the database.
+   * 
+   * @param $aid
+   *   Attribute ID to delete.
+   * @return (integer)
+   *   Return the Drupal SAVED_DELETED flag.
+   */
+  function uc_attribute_delete($aid) {
+    // Delete the class attributes and their options.
+    uc_attribute_subject_delete($aid, 'class');
+
+    // Delete the product attributes and their options.
+    uc_attribute_subject_delete($aid, 'product');
+
+    // Delete base attributes and their options.
+    db_query("DELETE FROM {uc_attribute_options} WHERE aid = %d", $aid);
+    db_query("DELETE FROM {uc_attributes} WHERE aid = %d", $aid);
+
+    return SAVED_DELETED;
+  }
+} 
+
+if (!function_exists('uc_attribute_option_save')) {
+  /**
+   * Save an attribute object to the database.
+   * 
+   * @param $option
+   *   The attribute option object to save.
+   * @return (integer)
+   *   Return the result from drupal_write_record().
+   */
+  function uc_attribute_option_save(&$option) {
+    // Insert or update?
+    $key = empty($option->oid) ? NULL : 'oid';
+    return drupal_write_record('uc_attribute_options', $option, $key);
+  }
+} 
+
+if (!function_exists('uc_attribute_option_delete')) {
+  /**
+   * Delete an attribute option from the database.
+   * 
+   * @param $oid
+   *   Option ID to delete.
+   * @return (integer)
+   *   Return the Drupal SAVED_DELETED flag.
+   */
+  function uc_attribute_option_delete($oid) {
+    // Delete the class attribute options.
+    uc_attribute_subject_option_delete($oid, 'class');
+    
+    // Delete the product attribute options. (and the adjustments!)
+    uc_attribute_subject_option_delete($oid, 'product');
+    
+    // Delete base attributes and their options.
+    db_query("DELETE FROM {uc_attribute_options} WHERE oid = %d", $oid);
+    
+    return SAVED_DELETED;
+  }
+}
+
+
