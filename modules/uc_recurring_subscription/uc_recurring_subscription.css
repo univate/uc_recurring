@@ -31,3 +31,8 @@ form#uc-recurring-subscription-product-form div.subscription-unlimited-intervals
 #edit-notication-event-wrapper label {
   display: inline;
 }
+
+.ca-role-option div.form-item {
+  display: inline;
+  padding-right: 20px;
+}

@@ -136,7 +136,7 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
   $form['role'] = array(
     '#type' => 'fieldset',
     '#title' => 'Step Three: Role Assignment',
-    '#description' => t('Select the role(s) which are assigned to members who subscribe to this subscription product.'),
+    '#description' => t('Select the role(s) which are assigned to members who subscribe to this subscription product and then removed when the subscription expires.'),
   );
   $roles = user_roles(TRUE);
   unset($roles[DRUPAL_AUTHENTICATED_RID]);

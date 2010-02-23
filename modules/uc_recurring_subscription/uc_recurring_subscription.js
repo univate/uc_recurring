@@ -15,4 +15,12 @@ Drupal.behaviors.UcRecurringSubscriptionForm = function (context) {
   });
 };
 
-
+Drupal.behaviors.UcRoleCaForm = function (context) {
+  $(".ca-role-select-option").change(function() {
+    if ($(this).val() == "custom") {
+      $(this).parent("form").children(".ca-role-option").css("background", "red");
+    } else {
+      $(this).parent("form").children(".ca-role-option").css("display", "none");
+    }
+  });
+};
