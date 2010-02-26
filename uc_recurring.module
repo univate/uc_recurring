@@ -578,11 +578,17 @@ function uc_recurring_renew($fee) {
   $product->data['recurring_fee'] = TRUE;
   $new_order->products = array($product);
 
+  // We want the line items to be regenerated.
+  unset($new_order->line_items);
+
   // Give other modules a chance to modify the new order before processing
   foreach (module_implements('recurring_renewal_pending') as $module) {
     $func = $module .'_recurring_renewal_pending';
     $func($new_order, $fee);
   }
+
+  $new_order->line_items = uc_order_load_line_items($new_order, TRUE);
+
   uc_order_save($new_order);
   uc_order_update_status($new_id, 'pending');
 
