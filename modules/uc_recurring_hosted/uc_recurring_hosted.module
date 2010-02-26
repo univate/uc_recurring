@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_hosted.module,v 1.1.2.10 2009/12/31 01:46:04 univate Exp $
+// $Id: uc_recurring_hosted.module,v 1.1.2.11 2010/02/26 15:41:20 univate Exp $
 
 /**
  * @file
@@ -520,7 +520,7 @@ function uc_recurring_hosted_form_uc_paypal_wps_form_alter(&$form, $form_state) 
     $data['t1'] = strtoupper($t[0]);
     // recurring payments
     list($p, $t) = explode(' ', $recurring_fee['recurring product']->regular_interval);
-    $data['a3'] = sprintf("%0.2f", $product_fee->fee_amount == 0 ? $recurring_fee['product']->price : $recurring_fee['recurring product']->fee_amount);
+    $data['a3'] = sprintf("%0.2f", $recurring_fee['recurring product']->fee_amount == 0 ? $recurring_fee['product']->price : $recurring_fee['recurring product']->fee_amount);
     $data['p3'] = $p;
     $data['t3'] = strtoupper($t[0]);
 
