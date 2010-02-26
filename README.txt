@@ -57,6 +57,11 @@ To integrate with a new payment gateway you should first look at the
 hook_recurring_info() function as this defines all the details uc_recurring
 needs to work with a new gateway.
 
+Credits
+*******
+Ryan Szrama (http://www.commerceguys.com/)
+Chris Hood (http://www.univate.com.au/)
+
 LICENSE
 ~~~~~~~
 
