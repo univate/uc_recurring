@@ -152,12 +152,12 @@ function uc_recurring_subscription_ca_predicate() {
  */
 function uc_recurring_subscription_action_grant_role($order, $settings) {
   $account = user_load($order->uid);
-  
+
   $roles = user_roles(TRUE);
-  if ($settings['role_option'] == 'custom') { 
+  if ($settings['role_option'] == 'custom') {
     $account->roles += $settings['role'];
     watchdog('uc_recurring', 'Granted !role role to !user', array('!role' => $roles[$rid], '!user' => $account->name));
-  } 
+  }
   else {
     foreach ($order->products as $pid => $product) {
       $subscription = uc_recurring_subscription_load($product->nid);
@@ -191,7 +191,7 @@ function uc_recurring_subscription_action_grant_role_form($form_state, $settings
       '#value' => t('There are no roles available to select. <a href="!url">Add a role</a>.', array('!url' => url('admin/user/roles'))),
     );
   }
-  else { 
+  else {
     $form['role'] = array(
       '#type' => 'checkboxes',
       '#title' => t('Custom roles'),
@@ -208,14 +208,14 @@ function uc_recurring_subscription_action_grant_role_form($form_state, $settings
  */
 function uc_recurring_subscription_action_revoke_role($order, $settings) {
   $account = user_load($order->uid);
-  
+
   $roles = user_roles(TRUE);
   if ($settings['role_option'] == 'custom') {
     foreach ($settings['role'] as $rid => $role) {
       unset($account->roles[$rid]);
       watchdog('uc_recurring', 'Revoked !role role to !user', array('!role' => $roles[$rid], '!user' => $account->name));
     }
-  } 
+  }
   else {
     foreach ($order->products as $pid => $product) {
       $subscription = uc_recurring_subscription_load($product->nid);

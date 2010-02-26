@@ -11,14 +11,14 @@
  */
 function uc_recurring_subscription_overview() {
   $product_class = variable_get('uc_recurring_subscription_product_class', 'uc_recurring_subscription');
-  $result = db_query("SELECT n.nid, n.title 
+  $result = db_query("SELECT n.nid, n.title
                       FROM {node} n
                         LEFT JOIN {uc_recurring_subscription} rs ON rs.nid=n.nid
                       WHERE n.type = '%s'
                       ORDER BY rs.weight", $product_class);
 
   $roles = user_roles(TRUE);
-  
+
   $form['products']['#tree'] = TRUE;
   $form['products']['#theme'] = 'uc_recurring_subscription_products';
   while($node = db_fetch_object($result)) {
@@ -32,7 +32,7 @@ function uc_recurring_subscription_overview() {
     $products = _uc_recurring_subscription_product_feature($node->nid);
     $intervals = array();
     foreach ($products as $id => $feature) {
-      $intervals[] = uc_price($feature->fee_amount, array()) . t(' charged every '). $feature->regular_interval; 
+      $intervals[] = uc_price($feature->fee_amount, array()) . t(' charged every '). $feature->regular_interval;
     }
 
     $form['products'][$node->nid]['title'] = array('#value' => l($product->title, 'node/'. $product->nid));
@@ -293,7 +293,7 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
 function _uc_recurring_subscription_ahah_add_interval() {
   $delta = sizeof($_POST['recurring']) ? max(array_keys($_POST['recurring']))+1 : 0;
   $fields = _uc_recurring_subscription_add_interval_form($delta);
-  
+
   $form_state = array('submitted' => FALSE);
   $form_build_id = $_POST['form_build_id'];
   // Add the new element to the stored form. Without adding the element to the
@@ -426,13 +426,13 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
             $option->name = $option_name;
             uc_attribute_option_save($option);
           }
-          
+
           // Set the default product options.
           if ($value['pfid'] == $form_state['values']['default_payment']) {
             $prod_attr->default_option = $option->oid;
             $node->model = $product->model;
           }
- 
+
           // add the product option
           $prod_option = db_fetch_object(db_query("SELECT * FROM {uc_product_options} WHERE nid = %d AND oid = %d", $node->nid, $option->oid));
           $key = array('nid', 'oid');
@@ -454,7 +454,7 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
           uc_recurring_product_feature_save($product);
           $features[] = $product->pfid;
         }
- 
+
         if (count($form_state['values']['recurring']) <= 1) {
           $prod_attr->required = 0;
         }

@@ -84,7 +84,7 @@ function _uc_recurring_subscription_setup() {
   variable_set('node_options_'. $pcid, variable_get('node_options_product', array('status', 'promote')));
   variable_set('uc_recurring_subscription_product_class', $pcid);
 
-  $attribute = $pcid .'_payment_options'; 
+  $attribute = $pcid .'_payment_options';
   if ($aid = db_result(db_query("SELECT aid FROM {uc_attributes} WHERE name = '%s'", $attribute)) < 1) {
     db_query("INSERT INTO {uc_attributes} (name, label, ordering, required, display, description) VALUES ('%s', 'Payment Options', 0, 1, 1, 'The subscription payment options.')", $attribute);
     $aid = db_last_insert_id('uc_attributes', 'aid');
