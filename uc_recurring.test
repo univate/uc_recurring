@@ -286,7 +286,7 @@ class ucRecurringIntegrationTestCase extends ucRecurringTestCase {
   }
 
   function setUp() {
-    parent::setUp('uc_recurring', 'uc_payment', 'uc_recurring_mock_gateway');
+    parent::setUp('uc_order', 'uc_recurring', 'uc_payment', 'uc_recurring_mock_gateway');
 
     $this->createRecurringUsers();
   }
@@ -295,6 +295,9 @@ class ucRecurringIntegrationTestCase extends ucRecurringTestCase {
    * place an order with the mock gateway payment module
    */
   function testRecurringPaymentIntegration() {
+    global $gateway_status;
+    $gateway_status = TRUE;
+
     $this->drupalLogin($this->user_recurring_admin);
 
     $checkoutMessage = $this->randomName(20);
@@ -316,22 +319,21 @@ class ucRecurringIntegrationTestCase extends ucRecurringTestCase {
       $fee = $this->getSingleRecurringFeeFromOrder($order_id);
 
       $order = uc_order_load($order_id);
-      $this->assertEqual('completed', $order->order_status, t('Payment Received for order.'));
+      $this->assertTrue(uc_payment_balance($order) <= 0, t('Order @order_id payment processed', array('@order_id' => $order_id)));
 
       // test renewal on successful payment processing
       $this->processRecurringFee($fee->rfid, 1);
       $order = uc_order_load($this->lastCreatedOrderId());
-      $this->assertEqual('payment_received', $order->order_status, t('payment processed'));
+      $this->assertTrue(uc_payment_balance($order) <= 0, t('Order @order_id payment processed', array('@order_id' => $order->order_id)));
 
       // order should now be completed
 
       // test renewal on failed payment processing
-      global $gateway_status;
       $gateway_status = FALSE;
       $current_order_id = $this->lastCreatedOrderId();
       $this->processRecurringFee($fee->rfid, 1);
       $order = uc_order_load($this->lastCreatedOrderId());
-      $this->assertEqual($order->order_id, $current_order_id, t('no new order created on failed payment'));
+      $this->assertEqual($order->order_id, $current_order_id, t('No new order created on failed payment'));
     }
   }
 }
@@ -349,7 +351,7 @@ class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
   }
 
   function setUp() {
-    parent::setUp('uc_recurring', 'uc_payment', 'uc_paypal', 'uc_recurring_hosted');
+    parent::setUp('uc_order', 'uc_recurring', 'uc_payment', 'uc_paypal', 'uc_recurring_hosted');
 
     $this->createRecurringUsers();
   }
@@ -358,8 +360,6 @@ class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
    *  Place an order with the Paypal WPS gateway.
    */
   function testRecurringPaypal() {
-    module_load_include('inc', 'uc_recurring_hosted', 'uc_recurring_hosted.paypal_ipn');
-
     $this->drupalLogin($this->user_recurring_admin);
 
     $settings = array('uc_payment_method_paypal_wps_checkout' => TRUE, 'uc_paypal_wps_email' => 'paypal@example.com');
@@ -376,6 +376,7 @@ class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
 
     variable_set('uc_paypal_wps_server', url('uc_recurring_hosted/paypal/cgi-bin/webscr', array('absolute' => TRUE)));
     variable_set('uc_paypal_wps_checkout_button', t('Submit order'));
+    variable_set('uc_paypal_wps_debug_ipn', TRUE);
 
     $this->drupalPost('node/'.$product->nid, array(), t('Add to cart'));
     $this->assertRaw($product->title, t('The product name has been displayed on the cart page.'));
@@ -384,46 +385,50 @@ class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
     $order_id = $this->lastCreatedOrderId();
     $this->assertEqual($order_id, 1, t('First order created.'));
 
-    // The ipn is expecting all the variables to be in the $_POST variable.
-    global $_POST;
-    $_POST = $this->_uc_recurring_paypal_messages('subscr_signup', $order_id);
-    uc_recurring_hosted_paypal_ipn($order_id);
-    $order = uc_order_load($order_id);
-    $this->verbose(print_r($order, TRUE));
+    $url = url('uc_recurring_hosted/paypal/ipn/'. $order_id, array('absolute' => TRUE));
+    $headers = array('Content-Type' => 'application/x-www-form-urlencoded');
 
-    $_POST = $this->_uc_recurring_paypal_messages('subscr_payment', $order_id, 20);
-    uc_recurring_hosted_paypal_ipn($order_id);
+    $post = $this->paypal_message('subscr_signup', $order_id);
+
+    $response = drupal_http_request($url, $headers, 'POST', http_build_query($post, '', '&'));
+    $order = uc_order_load($order_id);
+
+    $post = $this->paypal_message('subscr_payment', $order_id, 20);
+    $response = drupal_http_request($url, $headers, 'POST', http_build_query($post, '', '&'));
     $new_order_id = $this->lastCreatedOrderId();
     $order = uc_order_load($new_order_id);
-    $this->verbose(print_r($order, TRUE));
 
-    $this->assertEqual('payment_received', $order->order_status, t('Order @order_id payment processed', array('@order_id' => $new_order_id)));
+    $this->assertTrue(uc_payment_balance($order) <= 0, t('Order @order_id payment processed', array('@order_id' => $new_order_id)));
 
     // Renew order.
-    $_POST = $this->_uc_recurring_paypal_messages('subscr_payment', $order_id, 50);
-    uc_recurring_hosted_paypal_ipn($order_id);
+    $post = $this->paypal_message('subscr_payment', $order_id, 50);
+    $response = drupal_http_request($url, $headers, 'POST', http_build_query($post, '', '&'));
     $new_order_id = $this->lastCreatedOrderId();
     $order = uc_order_load($new_order_id);
-    $this->assertEqual('payment_received', $order->order_status, t('Order @order_id payment processed', array('@order_id' => $new_order_id)));
+    $this->assertTrue(uc_payment_balance($order) <= 0, t('Order @order_id payment processed', array('@order_id' => $new_order_id)));
     $this->assertEqual($order_id+1, $new_order_id, t('New order created for renewal'));
 
     // Handle failed payment.
-    $_POST = $this->_uc_recurring_paypal_messages('subscr_failed', $order_id, 50);
-    uc_recurring_hosted_paypal_ipn($order_id);
+    $post = $this->paypal_message('subscr_failed', $order_id, 50);
+    $response = drupal_http_request($url, $headers, 'POST', http_build_query($post, '', '&'));
     $order = uc_order_load($new_order_id);
-    $this->assertEqual($order_id, $new_order_id, t('No new order created for failed payment.'));
 
     // Handle cancellation.
-    $_POST = $this->_uc_recurring_paypal_messages('subscr_cancel', $order_id, 50);
-    uc_recurring_hosted_paypal_ipn($order_id);
+    $post = $this->paypal_message('subscr_cancel', $order_id, 50);
+    $response = drupal_http_request($url, $headers, 'POST', http_build_query($post, '', '&'));
     $order = uc_order_load($new_order_id);
-    $this->assertEqual($order_id, $new_order_id, t('No new order created for cancelled order.'));
+
+    $fee = $this->getSingleRecurringFeeFromOrder($order_id);
+    $this->assertEqual($fee->number_intervals, 0, t('Order has been cancelled'));
+
+    module_load_include('inc', 'uc_order', 'uc_order.admin');
+    $this->verbose(uc_order_log($order));
   }
 
   /**
    * Mock return values from paypal
    */
-  function _uc_recurring_paypal_messages($msg_type, $order_id, $amount = 0) { 
+  function paypal_message($msg_type, $order_id, $amount = 0) { 
     $subscr_id = 'S-36L13190CF840735L';
     $lastname = 'lastname';
     $firstname = 'firstname';
@@ -466,7 +471,7 @@ class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
         'last_name' => $lastname,
         'residence_country' => 'AU',
         'item_name' => $order_title,
-        'payment_gross' => sprintf("0.2f", $amount),
+        'payment_gross' => sprintf("%0.2f", $amount),
         'mc_currency' => 'USD',
         'business' => $site_email,
         'payment_type' => 'instant',
@@ -483,7 +488,7 @@ class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
         'payment_status' => 'Completed',
         'payment_fee' => '2.63',
         'mc_fee' => '2.63',
-        'mc_gross' => sprintf("0.2f", $amount),
+        'mc_gross' => sprintf("%0.2f", $amount),
         'charset' => 'windows-1252',
         'notify_version' => '2.8',
       ),

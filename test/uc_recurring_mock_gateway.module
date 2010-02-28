@@ -6,8 +6,6 @@
  * Uc recurring implementation for the test gateway module.
  */
 
-$gateway_status = TRUE;
-
 /**
  * Implementation of hook_payment_method().
  */
