@@ -462,6 +462,7 @@ function uc_recurring_uc_message() {
  */
 function uc_recurring_process_order($order, $data = array()) {
   global $user;
+
   // Get all the products that should have a recurring fee created for them.
   if (($products = uc_recurring_get_recurring_products_in_order($order))) {
     // Check we have an handler to deal with the recurring payment.
@@ -670,7 +671,7 @@ function uc_recurring_process_extensions(&$fee) {
 function uc_recurring_extend_fee(&$fee, $extend_seconds) {
   $fee->attempts++;
   $fee->next_charge += $extend_seconds;
-  if ($extend_seconds == 0) {
+  if ($extend_seconds <= 0) {
     $fee->remaining_intervals = 0;
   }
   uc_recurring_fee_user_save($fee);
