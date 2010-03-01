@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.module,v 1.1.4.75 2010/02/28 20:32:54 univate Exp $
+// $Id: uc_recurring.module,v 1.1.4.76 2010/03/01 12:00:46 univate Exp $
 
 /**
  * @file
@@ -568,7 +568,7 @@ function uc_recurring_renew($fee) {
   $product->nid = $fee->data['nid'];
   $product->model = $fee->data['model'];
   $product->title = !empty($fee->fee_title) ? $fee->fee_title : t('Renewal of product @model', array('@model' => $product->model));
-  $product->qty = $fee->data['qty'];
+  $product->qty = !empty($fee->data['qty']) ? $fee->data['qty'] : 1;
   $product->price = $fee->fee_amount / $product->qty;
 
   // initialize these items to remove warnings
