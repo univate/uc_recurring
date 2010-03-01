@@ -1,0 +1,5 @@
+name = Recurring Fees - Order
+description = Recurring Fees for duplicating entire orders.
+dependencies[] = uc_recurring
+package = Ubercart - payment
+core = 6.x
