@@ -1,12 +1,10 @@
 <?php
-// $Id: uc_recurring_mock_gateway.module,v 1.1.2.2 2009/09/24 04:26:22 univate Exp $
+// $Id: uc_recurring_mock_gateway.module,v 1.1.2.3 2010/02/28 20:34:12 univate Exp $
 
 /**
  * @file
  * Uc recurring implementation for the test gateway module.
  */
-
-$gateway_status = TRUE;
 
 /**
  * Implementation of hook_payment_method().

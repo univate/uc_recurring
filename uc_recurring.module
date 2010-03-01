@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.module,v 1.1.4.73 2010/02/26 12:37:15 univate Exp $
+// $Id: uc_recurring.module,v 1.1.4.75 2010/02/28 20:32:54 univate Exp $
 
 /**
  * @file
@@ -462,6 +462,7 @@ function uc_recurring_uc_message() {
  */
 function uc_recurring_process_order($order, $data = array()) {
   global $user;
+
   // Get all the products that should have a recurring fee created for them.
   if (($products = uc_recurring_get_recurring_products_in_order($order))) {
     // Check we have an handler to deal with the recurring payment.
@@ -578,11 +579,17 @@ function uc_recurring_renew($fee) {
   $product->data['recurring_fee'] = TRUE;
   $new_order->products = array($product);
 
+  // We want the line items to be regenerated.
+  unset($new_order->line_items);
+
   // Give other modules a chance to modify the new order before processing
   foreach (module_implements('recurring_renewal_pending') as $module) {
     $func = $module .'_recurring_renewal_pending';
     $func($new_order, $fee);
   }
+
+  $new_order->line_items = uc_order_load_line_items($new_order, TRUE);
+
   uc_order_save($new_order);
   uc_order_update_status($new_id, 'pending');
 
@@ -664,7 +671,7 @@ function uc_recurring_process_extensions(&$fee) {
 function uc_recurring_extend_fee(&$fee, $extend_seconds) {
   $fee->attempts++;
   $fee->next_charge += $extend_seconds;
-  if ($extend_seconds == 0) {
+  if ($extend_seconds <= 0) {
     $fee->remaining_intervals = 0;
   }
   uc_recurring_fee_user_save($fee);
