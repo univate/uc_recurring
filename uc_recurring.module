@@ -491,6 +491,7 @@ function uc_recurring_process_order($order, $data = array()) {
       // If the product fee amount is 0, it means we need to use the product
       // price. This allows recurring fees to be adjusted by attributes.
       $fee->fee_amount = $product_fee->fee_amount == 0 ? $product['product']->price : $product_fee->fee_amount;
+      $fee->fee_amount *= $product['product']->qty;
 
       // Add the product's title as the order title.
       $fee->fee_title = t('Renewal of product @title', array('@title' => $product['product']->title));
@@ -503,6 +504,7 @@ function uc_recurring_process_order($order, $data = array()) {
       $fee->data = array(
         'model' => $product_fee->model,
         'nid' => $product_fee->nid,
+        'qty' => $product['product']->qty,
         'recurring orders' => array(),
       ) + $data;
       $fee->attempts = 0;
@@ -566,8 +568,8 @@ function uc_recurring_renew($fee) {
   $product->nid = $fee->data['nid'];
   $product->model = $fee->data['model'];
   $product->title = !empty($fee->fee_title) ? $fee->fee_title : t('Renewal of product @model', array('@model' => $product->model));
-  $product->qty = 1;
-  $product->price = $fee->fee_amount;
+  $product->qty = $fee->data['qty'];
+  $product->price = $fee->fee_amount / $product->qty;
 
   // initialize these items to remove warnings
   $product->cost = 0;
