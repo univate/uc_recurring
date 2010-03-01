@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.uc_authorizenet.inc,v 1.1.2.7 2009/10/10 03:56:20 univate Exp $
+// $Id: uc_recurring.uc_authorizenet.inc,v 1.1.2.8 2010/03/01 03:38:23 univate Exp $
 
 /**
  * @file
@@ -93,6 +93,11 @@ function uc_recurring_authorizenet_cim_renew($order, &$fee) {
  * Create form for updating credit card details for recurring fee.
  */
 function uc_recurring_authorizenet_cim_update_form($form_state, $rfid) {
+  // Load fee.
+  $fee = uc_recurring_fee_user_load($rfid);
+  // Load corresponding order.
+  $order = uc_order_load($fee->order_id);
+
   $form['rfid'] = array(
     '#type' => 'value',
     '#value' => $rfid,
