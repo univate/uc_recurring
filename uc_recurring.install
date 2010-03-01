@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.install,v 1.1.4.8 2009/11/09 14:52:19 univate Exp $
+// $Id: uc_recurring.install,v 1.1.4.9 2010/03/01 11:30:17 univate Exp $
 
 /**
  * @file
@@ -268,7 +268,7 @@ function uc_recurring_install() {
   // Add default extensions periods.
   $three_days = strtotime("+3 days", 0);
   $five_days = strtotime("+5 days", 0);
-  db_query("INSERT INTO {uc_recurring_extensions} (pfid, rebill_attempt, time_to_extend) VALUES (NULL, 1, %d), (NULL, 2, %d), (NULL, 3, 0)", $three_days, $five_days);
+  db_query("INSERT INTO {uc_recurring_extensions} (pfid, rebill_attempt, time_to_extend) VALUES (NULL, 0, %d), (NULL, 1, %d), (NULL, 2, 0)", $three_days, $five_days);
 }
 
 /**
