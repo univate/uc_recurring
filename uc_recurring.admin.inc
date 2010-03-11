@@ -132,8 +132,7 @@ function uc_recurring_admin_charge_form($form_state, $rfid, $fee_handler) {
       '#type' => 'hidden',
       '#value' => $fee->rfid
     );
-  
-  
+
     $form['message'] = array(
       '#value' => '<div>'. t('Are you sure you want to charge the customer @amount at this time?', array('@amount' => uc_price($fee->fee_amount, $context))) .'</div>',
     );
@@ -172,7 +171,7 @@ function uc_recurring_admin_edit_form($form_state, $rfid, $fee_handler) {
   if ($fee->fee_handler == $fee_handler) {
     drupal_add_css(drupal_get_path('module', 'uc_recurring') .'/uc_recurring.css');
     drupal_add_js(drupal_get_path('module', 'uc_recurring') .'/uc_recurring.js', 'module');
-  
+
     list($fee->regular_interval_value, $fee->regular_interval_unit) = explode(' ', $fee->regular_interval);
 
     $form['fee_title'] = array(
@@ -239,7 +238,7 @@ function uc_recurring_admin_edit_form($form_state, $rfid, $fee_handler) {
         '#default_value' => array('year' => date('Y', $fee->next_charge), 'month' => date('n', $fee->next_charge), 'day' => date('j', $fee->next_charge)),
       );
     }
-  
+
     $form['regular'] = array(
       '#type' => 'fieldset',
       '#title' => t('Regular interval'),
@@ -268,13 +267,13 @@ function uc_recurring_admin_edit_form($form_state, $rfid, $fee_handler) {
       '#title' => t('Reset the next charge timer upon form submission using the specified interval.'),
       '#description' => t('This will ignore the next charge field above and instead reset the next charge date to one regular interval from now.'),
     );
-  
+
     $form['submit'] = array(
       '#type' => 'submit',
       '#value' => t('Submit'),
       '#suffix' => l(t('Cancel'), uc_referer_uri()),
     );
-  
+
     return $form;
   }
   else {
@@ -290,7 +289,7 @@ function uc_recurring_admin_edit_form_validate($form, &$form_state) {
 
 function uc_recurring_admin_edit_form_submit($form, &$form_state) {
   global $user;
-  $rfid = arg(4); 
+  $rfid = arg(4);
   $fee = uc_recurring_fee_user_load($rfid);
 
   $member = user_load($fee->uid);

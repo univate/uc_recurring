@@ -10,6 +10,7 @@
  * Create the subscription overiew page.
  */
 function uc_recurring_subscription_overview() {
+  drupal_add_css(drupal_get_path('module', 'uc_recurring_subscription') .'/uc_recurring_subscription.css');
   $product_class = variable_get('uc_recurring_subscription_product_class', 'uc_recurring_subscription');
   $result = db_query("SELECT n.nid, n.title
                       FROM {node} n
@@ -24,15 +25,24 @@ function uc_recurring_subscription_overview() {
   while($node = db_fetch_object($result)) {
     $product = node_load($node->nid);
 
+    $attribute = uc_attribute_load(variable_get('uc_recurring_subscription_attribute', ''));
+
     // roles
     if (!empty($product->subscription)) {
       $product_roles = array_intersect_key($roles, $product->subscription->roles);
     }
     // payment options
-    $products = _uc_recurring_subscription_product_feature($node->nid);
+    $products = _uc_recurring_subscription_get_product_features($node->nid);
     $intervals = array();
     foreach ($products as $id => $feature) {
-      $intervals[] = uc_price($feature->fee_amount, array()) . t(' charged every '). $feature->regular_interval;
+      $interval = uc_price($feature->fee_amount, array()) . t(' charged every '). $feature->regular_interval;
+      if ($product->attributes[$attribute->aid]->default_option == $feature->option->oid ) {
+        $interval = '<span class="default-option">'. $interval .'</span>';
+      }
+      if (module_exists('uc_cart_links')) {
+        $interval .= ' '. t('(<a href="@link">cart link</a>)', array('@link' => url('cart/add/e-p'. $node->nid .'_q1-isub_a'. $attribute->aid .'o'. $feature->option->oid, array('query' => 'destination=cart/checkout', 'absolute' => TRUE))));
+      }
+      $intervals[] = $interval;
     }
 
     $form['products'][$node->nid]['title'] = array('#value' => l($product->title, 'node/'. $product->nid));
@@ -125,12 +135,15 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
     $recurring_count = $form_state['recurring_count'];
   }
   else {
-    $products = _uc_recurring_subscription_product_feature($node->nid);
+    $products = _uc_recurring_subscription_get_product_features($node->nid);
     $recurring_count = count($products);
   }
   $form['recurring']['recurring_intervals']['#theme'] = 'uc_recurring_subscription_item';
-  for ($delta = 0; $delta < $recurring_count; $delta++) {
-    $form['recurring']['recurring_intervals'][$delta] = _uc_recurring_subscription_add_interval_form($delta, $products[$delta]);
+  if ($recurring_count > 0) {
+    $delta = 0;
+    foreach ($products as $product) {
+      $form['recurring']['recurring_intervals'][$delta++] = _uc_recurring_subscription_add_interval_form($delta, $product);
+    }
   }
 
   $form['role'] = array(
@@ -203,17 +216,20 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
   $form = array(
     '#tree' => TRUE,
   );
-
   $form['pfid'] = array(
     '#type' => 'hidden',
     '#value' => $product->pfid,
     '#parents' => array('recurring', $delta, 'pfid'),
   );
-
+  $attrib = array('checked' => 'not-checked');
+  if (isset($product) && isset($product->option->default_option)) {
+    $attrib = array('checked' => 'checked');
+  }
   $form['default'] = array(
     '#type' => 'radio',
     '#parents' => array('default_payment'),
     '#value' => $product->pfid,
+    '#attributes' => $attrib,
   );
   $form['interval_value'] = array(
     '#type' => 'textfield',
@@ -232,7 +248,7 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
       'years' => t('year(s)'),
     ),
     '#default_value' => $product->regular_interval_unit,
-    '#prefix' => '<div class="subscripion-interval-period">',
+    '#prefix' => '<div class="subscription-interval-period">',
     '#suffix' => '</div>',
     '#parents' => array('recurring', $delta, 'interval_unit'),
   );
@@ -265,10 +281,12 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
     '#suffix' => '</div>',
     '#parents' => array('recurring', $delta, 'unlimited'),
   );
+
   $form['weight'] = array(
     '#type' => 'weight',
-    '#delta' => 10,
-    '#default_value' => $delta,
+    '#delta' => 50,
+    '#default_value' => $product->option->ordering,
+    '#parents' => array('recurring', $delta, 'weight'),
   );
   $form['operations'] = array(
     '#type' => 'button',
@@ -367,6 +385,8 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
       node_delete($form_state['values']['product_id']);
       break;
     default: // Save
+      drupal_set_message('<pre>'. print_r($form_state['values'],TRUE) .'</pre>');
+
       if (empty($form_state['values']['product_id'])) {
         $node = new stdClass();
         $node->type = variable_get('uc_recurring_subscription_product_class', 'uc_recurring_subscription');
@@ -442,7 +462,7 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
             $prod_option->oid = $option->oid;
             $key = NULL;
           }
-          $prod_option->weight = $value['weight'];
+          $prod_option->ordering = $value['weight'];
           drupal_write_record('uc_product_options', $prod_option, $key);
 
           $prod_adj = new stdClass();
@@ -544,7 +564,7 @@ function theme_uc_recurring_subscription_item($form) {
  * Add table drag effect to product commission table.
  */
 function theme_uc_recurring_subscription_products($form) {
-  $header = array(t('Name'), t('Role'), t('Payment Options'), '');
+  $header = array(t('Name'), t('Assigned role(s)'), t('Payment Options'), '');
   drupal_add_tabledrag('recurring-subscription-products', 'order', 'sibling', 'product-weight');
 
   foreach (element_children($form) as $key) {
@@ -570,6 +590,7 @@ function theme_uc_recurring_subscription_products($form) {
   }
 
   $output = theme('table', $header, $rows, array('id' => 'recurring-subscription-products'));
+  $output .= '<div><span class="default-option">'. t('default subscription option') .'</span></div>';
   $output .= drupal_render($form);
   return $output;
 }

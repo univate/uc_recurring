@@ -95,7 +95,6 @@ function uc_recurring_subscription_menu() {
     'file' => 'uc_recurring_subscription.admin.inc',
   );
 
-
   return $items;
 }
 
@@ -136,14 +135,39 @@ function uc_recurring_subscription_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) 
 }
 
 /**
- *
+ * This loads the reucrring product features as well as the attribute option for
+ * this feature.
  */
-function _uc_recurring_subscription_product_feature($product_id) {
+function _uc_recurring_subscription_get_product_features($product_id) {
+  $attribute = uc_attribute_load(variable_get('uc_recurring_subscription_attribute', ''), $product_id, 'product');
+
   $result = db_query("SELECT pfid from {uc_recurring_products} WHERE nid = '%d'", $product_id);
   while ($p = db_fetch_object($result)) {
-    $products[] = uc_recurring_fee_product_load($p->pfid);
+    $product = uc_recurring_fee_product_load($p->pfid);
+
+    $option_name = _uc_recurring_subscription_create_attribute_option($product->regular_interval_value, $product->regular_interval_unit);
+    $option = _uc_recurring_subscription_option($option_name);
+    $product->option = uc_attribute_subject_option_load($option->oid, 'product', $product_id);
+
+    if ($attribute->default_option == $option->oid) {
+      $product->option->default_option = TRUE;
+    }
+
+    $products[] = $product;
+  }
+  if (count($products) > 1) {
+    usort($products, '_uc_recurring_subscription_product_feature_sort');
   }
   return $products;
+}
+
+/**
+ *
+ */
+function _uc_recurring_subscription_option($option_name) {
+  $attribute = uc_attribute_load(variable_get('uc_recurring_subscription_attribute', ''));
+  $option = _uc_recurring_subscription_attribute_option_by_name($attribute->aid, $option_name);
+  return $option;
 }
 
 /**
@@ -161,32 +185,38 @@ function uc_recurring_subscription_theme() {
 }
 
 /**
- *
+ * Format a standard naming convension for attribute names.
  */
 function _uc_recurring_subscription_create_attribute_option($value, $interval) {
   if ($value == 1) {
-    switch ($interval) {
-      case 'days':
-        return t('Daily');
-      case 'weeks':
-        return t('Weekly');
-      case 'months':
-        return t('Monthly');
-      case 'year':
-        return t('Yearly');
-    }
+    $intervals = array(
+      'days' => t('Daily'),
+      'weeks' => t('Weekly'),
+      'months' => t('Monthly'),
+      'year' => t('Yearly')
+    );
+    return $intervals[$interval];
   }
-
   return t('Every @value @interval', array('@value' => $value, '@interval' => $interval));
 }
 
 /**
- *
+ * Find attribute option with a given aid and name
  */
 function _uc_recurring_subscription_attribute_option_by_name($aid, $name) {
   $option = db_fetch_object(db_query("SELECT * from {uc_attribute_options} WHERE aid = %d AND name = '%s'", $aid, $name));
   return $option;
 }
 
-
+/**
+ * Function used by uasort to sort product features.
+ */
+function _uc_recurring_subscription_product_feature_sort($a, $b) {
+  $a_weight = (isset($a->option) && isset($a->option->weight)) ? $a->option->weight : 0;
+  $b_weight = (isset($b->option) && isset($b->option->weight)) ? $b->option->weight : 0;
+  if ($a_weight == $b_weight) {
+    return 0;
+  }
+  return ($a_weight < $b_weight) ? -1 : 1;
+}
 
