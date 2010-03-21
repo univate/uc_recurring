@@ -6,12 +6,12 @@
  */
 function uc_recurring_subscription_ca_entity() {
   $entities = array();
-/*
+
   $entities['uc_recurring_subscription'] = array(
     '#title' => t('Recurring subscription'),
     '#type' => 'object',
   );
-*/
+
   return $entities;
 }
 
@@ -19,16 +19,7 @@ function uc_recurring_subscription_ca_entity() {
  * Implementation of hook_ca_condition().
  */
 function uc_recurring_subscription_ca_condition() {
-  /*
-  $conditions['uc_recurring_subscription_event_type'] = array(
-    '#title' => t('Check the subscription event type'),
-    '#category' => t('ClickandBuy'),
-    '#callback' => 'uc_recurring_subscription_condition_event_type',
-    '#arguments' => array(
-      'event' => array('#entity' => 'uc_recurring_subscription'),
-    ),
-  );
-*/
+  $condition = array();
   return $conditions;
 }
 
@@ -171,14 +162,13 @@ function uc_recurring_subscription_action_grant_role($order, $settings) {
  * Grant role CA form.
  */
 function uc_recurring_subscription_action_grant_role_form($form_state, $settings = array()) {
-  drupal_add_js(drupal_get_path('module', 'uc_recurring_subscription') .'/uc_recurring_subscription.js', 'module');
   drupal_add_css(drupal_get_path('module', 'uc_recurring_subscription') .'/uc_recurring_subscription.css');
   $form['role_option'] = array(
     '#type' => 'radios',
     '#title' => t('Where are the role(s) defined?'),
     '#attributes' => array('class' => 'ca-role-select-option'),
     '#options' => array(
-      'order' => t('From related product in order (e.g. set by Recurring Subscription Manager).'),
+      'order' => t('Set by Recurring Subscription Manager'),
       'custom' => t('Custom selected role (select from below)'),
     ),
     '#default_value' => $settings['role_option'],
@@ -213,7 +203,7 @@ function uc_recurring_subscription_action_revoke_role($order, $settings) {
   if ($settings['role_option'] == 'custom') {
     foreach ($settings['role'] as $rid => $role) {
       unset($account->roles[$rid]);
-      watchdog('uc_recurring', 'Revoked !role role to !user', array('!role' => $roles[$rid], '!user' => $account->name));
+      watchdog('uc_recurring', 'Revoked !role role from !user', array('!role' => $roles[$rid], '!user' => $account->name));
     }
   }
   else {
@@ -221,7 +211,6 @@ function uc_recurring_subscription_action_revoke_role($order, $settings) {
       $subscription = uc_recurring_subscription_load($product->nid);
       foreach ($subscription->roles as $rid => $role) {
         unset($account->roles[$rid]);
-        watchdog('uc_recurring', 'Revoked !role role to !user', array('!role' => $roles[$rid], '!user' => $account->name));
       }
     }
   }

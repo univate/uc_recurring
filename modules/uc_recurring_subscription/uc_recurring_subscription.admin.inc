@@ -52,11 +52,18 @@ function uc_recurring_subscription_overview() {
       if (module_exists('uc_cart_links')) {
         $interval .= ' '. t('(<a href="@link">cart link</a>)', array('@link' => url('cart/add/e-p'. $node->nid .'_q1_a'. $attribute->aid .'o'. $feature->option->oid .'-isub', array('query' => 'destination=cart/checkout', 'absolute' => TRUE))));
       }
+
+      if ($feature->regular_interval_value != $feature->initial_charge_value &&
+          $feature->regular_interval_unit != $feature->initial_charge_unit) {
+        $trial = uc_price($product->sell_price, array()) .' - '. $feature->initial_charge_value .' '. $feature->initial_charge_unit;
+      }
+
       $intervals[] = $interval;
     }
 
     $form['products'][$node->nid]['title'] = array('#value' => l($product->title, 'node/'. $product->nid));
     $form['products'][$node->nid]['role'] = array('#value' => implode(', ', $product_roles));
+    $form['products'][$node->nid]['trial'] = array('#value' => empty($trial) ? t('None') : $trial);
     $form['products'][$node->nid]['interval'] = array('#value' => implode('<br/>', $intervals));
     $form['products'][$node->nid]['operations'] = array(
       '#value' => l('edit', 'admin/store/subscriptions/'. $node->nid .'/edit') .' | '. l('delete', 'node/'. $node->nid .'/delete', array('query' => 'destination=admin/store/subscriptions'))
@@ -96,8 +103,8 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
       '#value' => $product_id,
     );
     $node = node_load($product_id);
+    $products = _uc_recurring_subscription_get_product_features($node->nid);
   }
-
   $form['product'] = array(
     '#type' => 'fieldset',
     '#title' => 'Step One: Product Details',
@@ -119,6 +126,59 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
     '#title' => 'Step Two: Define Subscription Details',
     '#description' => t('By adding multiple payment options, users will be given the option to choose from one of these payment options, this allows you to specify different prices and payment plans for this subscription product'),
   );
+  $form['recurring']['trial'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Add trial',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  // We look at the default option for the trial information.
+  $aid = variable_get('uc_recurring_subscription_attribute', ''); 
+  if (!empty($aid)) {
+    $default_option = $node->attributes[$aid]->default_option;
+    $name = $node->attributes[$aid]->options[$default_option]->name;
+    foreach($products as $product) {
+      $num = $product->regular_interval_value;
+      $unit = $product->regular_interval_unit;
+      if ($name == _uc_recurring_subscription_create_attribute_option($num, $unit)) {
+        // This is the default product, the price and initial interval should
+        // be different if there is a trial.
+        if ($node->sell_price != $product->fee_amount &&
+            $product->regular_interval_value != $product->initial_charge_value &&
+            $product->regular_interval_unit != $product->initial_charge_unit) {
+          $trial_product = $product;
+          $form['recurring']['trial']['#collapsed'] = FALSE;
+        }
+        break;
+      }
+    }
+  }
+  $form['recurring']['trial']['trial_amount'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Trial Amount',
+    '#default_value' => !empty($trial_product) ? $node->sell_price : '',
+    '#size' => 20,
+  );
+  $form['recurring']['trial']['trial_interval_value'] = array(
+    '#type' => 'textfield',
+    '#default_value' => $trial_product->initial_charge_value,
+    '#size' => 2,
+    '#prefix' => '<div class="subscription-interval-value">',
+    '#suffix' => '</div>',
+  );
+  $form['recurring']['trial']['trial_interval_unit'] = array(
+    '#type' => 'select',
+    '#options' => array(
+      'days' => t('day(s)'),
+      'weeks' => t('week(s)'),
+      'months' => t('month(s)'),
+      'years' => t('year(s)'),
+    ),
+    '#default_value' => $trial_product->initial_charge_unit,
+    '#prefix' => '<div class="subscription-interval-period">',
+    '#suffix' => '</div>',
+  );
+
   $form['recurring']['add'] = array(
     '#type' => 'button',
     '#value' => 'Add a payment option',
@@ -145,7 +205,6 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
     $recurring_count = $form_state['recurring_count'];
   }
   else {
-    $products = _uc_recurring_subscription_get_product_features($node->nid);
     $recurring_count = count($products);
   }
   $form['recurring']['recurring_intervals']['#theme'] = 'uc_recurring_subscription_item';
@@ -239,7 +298,7 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
   $form['pfid'] = array(
     '#type' => 'hidden',
     '#value' => $product->pfid,
-    '#parents' => array('recurring', $delta, 'pfid'),
+    '#parents' => array('recurring_intervals', $delta, 'pfid'),
   );
   $form['interval_value'] = array(
     '#type' => 'textfield',
@@ -247,7 +306,7 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
     '#size' => 2,
     '#prefix' => '<div class="subscription-interval-value">',
     '#suffix' => '</div>',
-    '#parents' => array('recurring', $delta, 'interval_value'),
+    '#parents' => array('recurring_intervals', $delta, 'interval_value'),
   );
   $form['interval_unit'] = array(
     '#type' => 'select',
@@ -260,7 +319,7 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
     '#default_value' => $product->regular_interval_unit,
     '#prefix' => '<div class="subscription-interval-period">',
     '#suffix' => '</div>',
-    '#parents' => array('recurring', $delta, 'interval_unit'),
+    '#parents' => array('recurring_intervals', $delta, 'interval_unit'),
   );
   $form['amount'] = array(
     '#type' => 'textfield',
@@ -268,7 +327,7 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
     '#size' => 10,
     '#prefix' => '<div class="subscription-amount">',
     '#suffix' => '</div>',
-    '#parents' => array('recurring', $delta, 'amount'),
+    '#parents' => array('recurring_intervals', $delta, 'amount'),
   );
   $form['number_intervals'] = array(
     '#type' => 'textfield',
@@ -277,7 +336,7 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
     '#size' => 10,
     '#prefix' => '<div class="subscription-num-intervals">',
     '#suffix' => '</div>',
-    '#parents' => array('recurring', $delta, 'number_intervals'),
+    '#parents' => array('recurring_intervals', $delta, 'number_intervals'),
   );
   $attributes['class'] = 'unlimited-checkbox';
   if ($product->number_intervals < 0) {
@@ -289,19 +348,19 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
     '#attributes' => $attributes,
     '#prefix' => '<div class="subscription-unlimited-intervals">',
     '#suffix' => '</div>',
-    '#parents' => array('recurring', $delta, 'unlimited'),
+    '#parents' => array('recurring_intervals', $delta, 'unlimited'),
   );
 
   $form['weight'] = array(
     '#type' => 'weight',
     '#delta' => 50,
     '#default_value' => $product->option->ordering,
-    '#parents' => array('recurring', $delta, 'weight'),
+    '#parents' => array('recurring_intervals', $delta, 'weight'),
   );
   $form['operations'] = array(
     '#type' => 'button',
     '#value' => t('remove'),
-    '#parents' => array('recurring', $delta, 'operations'),
+    '#parents' => array('recurring_intervals', $delta, 'operations'),
     '#ahah' => array(
       'event' => 'click',
       'path' => 'subscriptions/ahah/remove_interval/'. $delta,
@@ -319,7 +378,7 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
  * Adds a payment intervals option.
  */
 function _uc_recurring_subscription_ahah_add_interval() {
-  $delta = sizeof($_POST['recurring']) ? max(array_keys($_POST['recurring']))+1 : 0;
+  $delta = sizeof($_POST['recurring_intervals']) ? max(array_keys($_POST['recurring_intervals']))+1 : 0;
   $fields = _uc_recurring_subscription_add_interval_form($delta);
 
   $form_state = array('submitted' => FALSE);
@@ -373,8 +432,8 @@ function _uc_recurring_subscription_ahah_remove_interval() {
  */
 function uc_recurring_subscription_product_form_validate(&$form, &$form_state) {
   // Make the changes we want to the form state.
-  if ($form_state['values']['recurring']) {
-    $form_state['recurring_count'] = count($form_state['values']['recurring']);
+  if ($form_state['values']['recurring_intervals']) {
+    $form_state['recurring_count'] = count($form_state['values']['recurring_intervals']);
   }
 
   if ($form_state['values']['op'] == 'submit') {
@@ -433,7 +492,9 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
 
         // add/update the recurring features
         $features = array();
-        foreach ($form_state['values']['recurring'] as $index => $value) {
+        foreach ($form_state['values']['recurring_intervals'] as $index => $value) {
+          if (!is_numeric($index)) continue;
+
           $new_feature = FALSE;
           if (!empty($value['pfid'])) {
             $product = uc_recurring_fee_product_load($value['pfid']);
@@ -490,20 +551,35 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
         // If there is only one option then don't make selection required.
         $attribute->required = (count($form_state['values']['recurring']) <= 1) ? 0 : 1;
 
+        // Process trial information.
+        $trial_amount = $form_state['values']['trial_amount'];
+        $trial_value = intval($form_state['values']['trial_interval_value']);
+        $trial_unit = $form_state['values']['trial_interval_unit'];
+        if ($trial_value > 0) {
+          $node->sell_price = $trial_amount;
+        }
+
         // We need to calculate the option prices adjustments.
         foreach ($attribute->options as $index => $option) {
-          $attribute->options[$index]->price = $option->price - $node->sell_price;
+          if ($trial_value > 0) {
+            $attribute->options[$index]->price = 0;
+          }
+          else {
+            $attribute->options[$index]->price = $option->price - $node->sell_price;
+          }
         }
         // Save the product attribute and options.
         uc_attribute_subject_save($attribute, 'product', $node->nid, TRUE);
         // Save the product features.
         foreach ($features as $feature) {
-          uc_recurring_product_feature_save($features);
+          if ($trial_value > 0) {
+            $feature->initial_charge = $trial_value .' '. $trial_unit;
+          }
+          uc_recurring_product_feature_save($feature);
         }
         // Save the product/node.
         node_save($node);
       }
-      dsm($features);
       break;
   }
   $form_state['redirect'] = 'admin/store/subscriptions';
@@ -586,7 +662,7 @@ function theme_uc_recurring_subscription_item($form) {
  * Add table drag effect to product commission table.
  */
 function theme_uc_recurring_subscription_products($form) {
-  $header = array(t('Name'), t('Assigned role(s)'), t('Payment Options'), '');
+  $header = array(t('Name'), t('Assigned role(s)'), t('Trial'), t('Payment Options'), '');
   drupal_add_tabledrag('recurring-subscription-products', 'order', 'sibling', 'product-weight');
 
   foreach (element_children($form) as $key) {
@@ -596,6 +672,7 @@ function theme_uc_recurring_subscription_products($form) {
     $row = array();
     $row[] = drupal_render($form[$key]['title']);
     $row[] = drupal_render($form[$key]['role']);
+    $row[] = drupal_render($form[$key]['trial']);
     $row[] = drupal_render($form[$key]['interval']);
     $row[] = drupal_render($form[$key]['weight']);
     $row[] = drupal_render($form[$key]['operations']);
