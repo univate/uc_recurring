@@ -10,6 +10,15 @@
  * Create the subscription overiew page.
  */
 function uc_recurring_subscription_overview() {
+
+  // Warn user if the ubercart API patch not applied.
+  if (!function_exists('uc_attribute_load_multiple')) {
+    drupal_set_message(t('This module requires a patch to ubercart, read the <a href="@readme">README.txt</a>', array(
+      '@readme' => url(drupal_get_path('module', 'uc_recurring_subscription') .'/README.txt')
+    )), 'error');
+    return '';
+  }
+
   drupal_add_css(drupal_get_path('module', 'uc_recurring_subscription') .'/uc_recurring_subscription.css');
   $product_class = variable_get('uc_recurring_subscription_product_class', 'uc_recurring_subscription');
   $result = db_query("SELECT n.nid, n.title
@@ -35,12 +44,13 @@ function uc_recurring_subscription_overview() {
     $products = _uc_recurring_subscription_get_product_features($node->nid);
     $intervals = array();
     foreach ($products as $id => $feature) {
-      $interval = uc_price($feature->fee_amount, array()) . t(' charged every '). $feature->regular_interval;
+      $interval = uc_price($feature->fee_amount, array()) .' - '. _uc_recurring_subscription_create_attribute_option($feature->regular_interval_value, $feature->regular_interval_unit);
+
       if ($product->attributes[$attribute->aid]->default_option == $feature->option->oid ) {
         $interval = '<span class="default-option">'. $interval .'</span>';
       }
       if (module_exists('uc_cart_links')) {
-        $interval .= ' '. t('(<a href="@link">cart link</a>)', array('@link' => url('cart/add/e-p'. $node->nid .'_q1-isub_a'. $attribute->aid .'o'. $feature->option->oid, array('query' => 'destination=cart/checkout', 'absolute' => TRUE))));
+        $interval .= ' '. t('(<a href="@link">cart link</a>)', array('@link' => url('cart/add/e-p'. $node->nid .'_q1_a'. $attribute->aid .'o'. $feature->option->oid .'-isub', array('query' => 'destination=cart/checkout', 'absolute' => TRUE))));
       }
       $intervals[] = $interval;
     }
@@ -49,7 +59,7 @@ function uc_recurring_subscription_overview() {
     $form['products'][$node->nid]['role'] = array('#value' => implode(', ', $product_roles));
     $form['products'][$node->nid]['interval'] = array('#value' => implode('<br/>', $intervals));
     $form['products'][$node->nid]['operations'] = array(
-      '#value' => l('edit', 'admin/store/subscriptions/'. $node->nid .'/edit') .' | '. l('delete', 'node/'. $node->nid .'/delete', array('query' => 'admin/store/subscriptions'))
+      '#value' => l('edit', 'admin/store/subscriptions/'. $node->nid .'/edit') .' | '. l('delete', 'node/'. $node->nid .'/delete', array('query' => 'destination=admin/store/subscriptions'))
     );
     $form['products'][$node->nid]['weight'] = array(
       '#type' => 'weight',
@@ -142,9 +152,19 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
   if ($recurring_count > 0) {
     $delta = 0;
     foreach ($products as $product) {
-      $form['recurring']['recurring_intervals'][$delta++] = _uc_recurring_subscription_add_interval_form($delta, $product);
+      $form['recurring']['recurring_intervals'][$delta] = _uc_recurring_subscription_add_interval_form($delta, $product);
+      $default_options[$delta] = $product->pfid;
+      if (isset($product) && $product->option->default_option) {
+        $default_option = $delta;
+      }
+      $delta++;
     }
   }
+  $form['recurring']['recurring_intervals']['default_payment'] = array(
+    '#type' => 'radios',
+    '#options' => $default_options,
+    '#default_value' => $default_option,
+  );
 
   $form['role'] = array(
     '#type' => 'fieldset',
@@ -198,7 +218,7 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
 }
 
 /**
- *
+ * This is just a helper function for handling ahah callbacks.
  */
 function uc_recurring_subscription_ahah($context) {
   $func = '_uc_recurring_subscription_ahah_'. $context;
@@ -210,7 +230,7 @@ function uc_recurring_subscription_ahah($context) {
 }
 
 /**
- *
+ * Creates the payment interval form elements.
  */
 function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
   $form = array(
@@ -220,16 +240,6 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
     '#type' => 'hidden',
     '#value' => $product->pfid,
     '#parents' => array('recurring', $delta, 'pfid'),
-  );
-  $attrib = array('checked' => 'not-checked');
-  if (isset($product) && isset($product->option->default_option)) {
-    $attrib = array('checked' => 'checked');
-  }
-  $form['default'] = array(
-    '#type' => 'radio',
-    '#parents' => array('default_payment'),
-    '#value' => $product->pfid,
-    '#attributes' => $attrib,
   );
   $form['interval_value'] = array(
     '#type' => 'textfield',
@@ -306,7 +316,7 @@ function _uc_recurring_subscription_add_interval_form($delta, $product = NULL) {
 }
 
 /**
- *
+ * Adds a payment intervals option.
  */
 function _uc_recurring_subscription_ahah_add_interval() {
   $delta = sizeof($_POST['recurring']) ? max(array_keys($_POST['recurring']))+1 : 0;
@@ -335,7 +345,7 @@ function _uc_recurring_subscription_ahah_add_interval() {
 }
 
 /**
- *
+ * Removes a payment interval option.
  */
 function _uc_recurring_subscription_ahah_remove_interval() {
   $form_state = array('submitted' => FALSE);
@@ -345,7 +355,7 @@ function _uc_recurring_subscription_ahah_remove_interval() {
   $form = form_get_cache($form_build_id, $form_state);
   $pfid = $form['recurring']['recurring_intervals'][$delta]['pfid']['#value'];
   if (!empty($pfid)) {
-    uc_recurring_fee_product_delete($pfid);
+    uc_product_feature_delete($pfid);
   }
   unset($form['recurring']['recurring_intervals'][$delta]);
   // Rebuild the form.
@@ -359,7 +369,7 @@ function _uc_recurring_subscription_ahah_remove_interval() {
 }
 
 /**
- *
+ * Validates the subscription form submission.
  */
 function uc_recurring_subscription_product_form_validate(&$form, &$form_state) {
   // Make the changes we want to the form state.
@@ -381,12 +391,9 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
   global $user;
   switch ($form_state['values']['op']) {
     case 'Delete':
-      // @todo add confirmation page
       node_delete($form_state['values']['product_id']);
       break;
     default: // Save
-      drupal_set_message('<pre>'. print_r($form_state['values'],TRUE) .'</pre>');
-
       if (empty($form_state['values']['product_id'])) {
         $node = new stdClass();
         $node->type = variable_get('uc_recurring_subscription_product_class', 'uc_recurring_subscription');
@@ -408,27 +415,32 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
         $node->body = $form_state['values']['body'];
         $node->list_price = $node->sell_price = $form_state['values']['recurring'][0]['amount'];
 
-        // Attribute.
-        $attribute = uc_attribute_load(variable_get('uc_recurring_subscription_attribute', ''));
-        // Product attribute record.
-        $prod_attr = db_fetch_object(db_query("SELECT * FROM {uc_product_attributes} WHERE nid = %d AND aid = %d", $node->nid, $attribute->aid));
-        // we are going to rewrite the product adjustment records.
-        db_query("DELETE FROM {uc_product_adjustments} WHERE nid = %d", $node->nid);
+        // Product attribute.
+        $attribute = uc_attribute_load(variable_get('uc_recurring_subscription_attribute', ''), $node->nid, 'product');
+
+        // We are going to delete and recreate the product option and adjustments.
+        uc_attribute_subject_delete($attribute->aid, 'product', $node->nid);
+        uc_attribute_adjustments_delete(array('nid' => $node->nid));
+
+        // Create product attribute without the options.
+        uc_attribute_subject_save($attribute, 'product', $node->nid);
 
         $subscription = new stdClass();
         $subscription->nid = $node->nid;
         $subscription->roles = $form_state['values']['subscribe'];
-
         $key = empty($node->subscription) ? NULL : 'nid';
         drupal_write_record('uc_recurring_subscription', $subscription, $key);
 
-        $features = array();
         // add/update the recurring features
+        $features = array();
         foreach ($form_state['values']['recurring'] as $index => $value) {
-          $product->pfid = $value['pfid'];
-
-          // @todo based on the subscription intervals we need to set up an attribute for this product
-          $product->model = 'sub-'. $node->nid .'-'. $product->pfid;
+          $new_feature = FALSE;
+          if (!empty($value['pfid'])) {
+            $product = uc_recurring_fee_product_load($value['pfid']);
+          }
+          else {
+            $product = new stdClass();
+          }
 
           $product->fee_amount = $value['amount'];
           $product->initial_charge = $value['interval_value'] .' '. $value['interval_unit'];
@@ -436,53 +448,54 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
           // If number intervals is negative, it means that it's unlimited intervals.
           $product->number_intervals = !empty($value['number_intervals']) ? $value['number_intervals'] : -1;
           $product->nid = $node->nid;
+          uc_recurring_product_feature_save($product);
+
+          // Create a model that hopefully will be unique.
+          $model = 'sub-'. $node->nid .'-'. $product->pfid;
 
           // get option or create if it doesn't exist.
-          $option_name = _uc_recurring_subscription_create_attribute_option($value['interval_value'], $value['interval_unit']);
+          $num = $value['interval_value'];
+          $unit = $value['interval_unit'];
+          $option_name = _uc_recurring_subscription_create_attribute_option($num, $unit);
           $option = _uc_recurring_subscription_attribute_option_by_name($attribute->aid, $option_name);
-          if (empty($option)) {
-            $option = new stdClass();
-            $option->aid = $attribute->aid;
-            $option->name = $option_name;
-            uc_attribute_option_save($option);
-          }
+
+          // Set the product option.
+          $option->nid = $node->nid;
+          $option->oid = $option->oid;
+          $option->ordering = $value['weight'];
+          $option->price = $value['amount'];
+          $attribute->options[$option->oid] = $option;
 
           // Set the default product options.
-          if ($value['pfid'] == $form_state['values']['default_payment']) {
-            $prod_attr->default_option = $option->oid;
-            $node->model = $product->model;
+          if ($index == $form_state['values']['default_payment']) {
+            $attribute->default_option = $option->oid;
+            $node->model = $model;
+            $node->sell_price = $product->fee_amount;
           }
 
-          // add the product option
-          $prod_option = db_fetch_object(db_query("SELECT * FROM {uc_product_options} WHERE nid = %d AND oid = %d", $node->nid, $option->oid));
-          $key = array('nid', 'oid');
-          if (empty($prod_option)) {
-            $prod_option = new stdClass();
-            $prod_option->nid = $node->nid;
-            $prod_option->oid = $option->oid;
-            $key = NULL;
+          // Set the product adjustments.
+          $adj = new stdClass();
+          $adj->nid = $node->nid;
+          $adj->combination = serialize(array($attribute->aid => $option->oid));
+          $adj->model = $model;
+          drupal_write_record('uc_product_adjustments', $adj);
+
+          // using the pfid
+          if ($model != $product->model) {
+            $product->model = $model;
+            uc_recurring_product_feature_save($product);
           }
-          $prod_option->ordering = $value['weight'];
-          drupal_write_record('uc_product_options', $prod_option, $key);
-
-          $prod_adj = new stdClass();
-          $prod_adj->nid = $node->nid;
-          $prod_adj->combination = serialize(array($attribute->aid => $option->oid));
-          $prod_adj->model = $product->model;
-          drupal_write_record('uc_product_adjustments', $prod_adj);
-
-          uc_recurring_product_feature_save($product);
           $features[] = $product->pfid;
         }
 
-        if (count($form_state['values']['recurring']) <= 1) {
-          $prod_attr->required = 0;
-        }
-        else {
-          $prod_attr->required = 1;
-        }
-        drupal_write_record('uc_product_attributes', $prod_attr, array('nid', 'aid'));
+        $attribute->required = (count($form_state['values']['recurring']) <= 1) ? 0 : 1;
 
+        // We need to calculate the option prices adjustments.
+        foreach ($attribute->options as $index => $option) {
+          $attribute->options[$index]->price = $option->price - $node->sell_price;
+        }
+        // Save the product attribute and options.
+        uc_attribute_subject_save($attribute, 'product', $node->nid, TRUE);
         node_save($node);
       }
       break;
@@ -541,11 +554,14 @@ function theme_uc_recurring_subscription_item($form) {
   drupal_add_tabledrag('recurring-subscription', 'order', 'sibling', 'recurring-weight');
 
   foreach (element_children($form) as $key) {
+    if ($key === 'default_payment') {
+      continue;
+    }
     // Add class to group weight fields for drag and drop.
     $form[$key]['weight']['#attributes']['class'] = 'recurring-weight';
 
     $row = array();
-    $row[] = drupal_render($form[$key]['default']);
+    $row[] = drupal_render($form['default_payment'][$key]);
     $row[] = drupal_render($form[$key]['interval_value']) .
              drupal_render($form[$key]['interval_unit']);
     $row[] = drupal_render($form[$key]['amount']);
@@ -556,7 +572,7 @@ function theme_uc_recurring_subscription_item($form) {
     $rows[] = array('data' => $row, 'class' => 'draggable tabledrag-leaf');
   }
   $output = theme('table', $header, $rows, array('id' => 'recurring-subscription'));
-  $output .= drupal_render($form);
+  //$output .= drupal_render($form);
   return $output;
 }
 

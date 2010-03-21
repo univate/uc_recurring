@@ -7,6 +7,27 @@
  */
 
 /**
+ * Implementation of hook_requirements().
+ */
+function uc_recurring_subscription_requirements($phase) {
+  $requirements = array();
+  // Ensure translations don't break at install time.
+  $t = get_t();
+
+  if ($phase == 'runtime') {
+    if (!function_exists('uc_attribute_load_multiple')) {
+      $requirements['uc_recurring_subscription'] = array(
+        'title' => $t('Subscription Manager'),
+        'value' => $t('Patch required to Ubercart.'),
+        'severity' => REQUIREMENT_ERROR,
+        'description' => $t('This module requires a patch to ubercart, read the <a href="@readme">README.txt</a>', array('@readme' => url(drupal_get_path('module', 'uc_recurring_subscription') .'/README.txt'))),
+      );
+    }
+  }
+  return $requirements;
+}
+
+/**
  * Implementation hook_schema().
  */
 function uc_recurring_subscription_schema() {

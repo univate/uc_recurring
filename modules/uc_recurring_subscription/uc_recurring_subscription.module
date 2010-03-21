@@ -205,6 +205,13 @@ function _uc_recurring_subscription_create_attribute_option($value, $interval) {
  */
 function _uc_recurring_subscription_attribute_option_by_name($aid, $name) {
   $option = db_fetch_object(db_query("SELECT * from {uc_attribute_options} WHERE aid = %d AND name = '%s'", $aid, $name));
+  // If it doesn't exist we create it.
+  if (empty($option)) {
+    $option = new stdClass();
+    $option->aid = $aid;
+    $option->name = $name;
+    uc_attribute_option_save($option);
+  }
   return $option;
 }
 
@@ -212,8 +219,8 @@ function _uc_recurring_subscription_attribute_option_by_name($aid, $name) {
  * Function used by uasort to sort product features.
  */
 function _uc_recurring_subscription_product_feature_sort($a, $b) {
-  $a_weight = (isset($a->option) && isset($a->option->weight)) ? $a->option->weight : 0;
-  $b_weight = (isset($b->option) && isset($b->option->weight)) ? $b->option->weight : 0;
+  $a_weight = (isset($a->option) && isset($a->option->ordering)) ? $a->option->ordering : 0;
+  $b_weight = (isset($b->option) && isset($b->option->ordering)) ? $b->option->ordering : 0;
   if ($a_weight == $b_weight) {
     return 0;
   }
