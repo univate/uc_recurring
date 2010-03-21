@@ -79,7 +79,7 @@ function uc_recurring_subscription_menu() {
     'type' => MENU_LOCAL_TASK,
     'file' => 'uc_recurring_subscription.admin.inc',
   );
-
+/*
   $items['admin/store/subscriptions/subscribers'] = array(
     'title' => 'Manage Subscribers',
     'description' => '.',
@@ -89,6 +89,7 @@ function uc_recurring_subscription_menu() {
     'type' => MENU_LOCAL_TASK,
     'file' => 'uc_recurring_subscription.admin.inc',
   );
+*/
   $items['admin/store/subscriptions/settings'] = array(
     'title' => 'Subscription Settings',
     'description' => '.',
