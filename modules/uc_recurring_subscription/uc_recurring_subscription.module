@@ -7,6 +7,17 @@
  */
 
 /**
+ * Implementation of hook_help().
+ */
+function uc_recurring_subscription_help($path, $arg) {
+  switch ($path) {
+    case 'admin/store/subscriptions':
+    case 'admin/store/subscriptions/overview':
+      return t("Below is a list of the subscription products managed by the subscription manager. A subscription is a product that members can purchase to gain access to a role on the site that is automatically renewed on a specific interval. You can add new subscription using the create subscription tab.");
+  }
+}
+
+/**
  * Implementation of hook_init().
  */
 function uc_recurring_subscription_init() {

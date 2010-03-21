@@ -143,8 +143,8 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
       if ($name == _uc_recurring_subscription_create_attribute_option($num, $unit)) {
         // This is the default product, the price and initial interval should
         // be different if there is a trial.
-        if ($node->sell_price != $product->fee_amount &&
-            $product->regular_interval_value != $product->initial_charge_value &&
+        if ($node->sell_price != $product->fee_amount ||
+            $product->regular_interval_value != $product->initial_charge_value ||
             $product->regular_interval_unit != $product->initial_charge_unit) {
           $trial_product = $product;
           $form['recurring']['trial']['#collapsed'] = FALSE;
@@ -549,7 +549,7 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
         }
 
         // If there is only one option then don't make selection required.
-        $attribute->required = (count($form_state['values']['recurring']) <= 1) ? 0 : 1;
+        $attribute->required = (count($form_state['values']['recurring_intervals']) <= 1) ? 0 : 1;
 
         // Process trial information.
         $trial_amount = $form_state['values']['trial_amount'];
