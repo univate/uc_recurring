@@ -153,7 +153,7 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
     $delta = 0;
     foreach ($products as $product) {
       $form['recurring']['recurring_intervals'][$delta] = _uc_recurring_subscription_add_interval_form($delta, $product);
-      $default_options[$delta] = $product->pfid;
+      $default_options[$delta] = '';
       if (isset($product) && $product->option->default_option) {
         $default_option = $delta;
       }
@@ -440,6 +440,7 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
           }
           else {
             $product = new stdClass();
+            uc_recurring_product_feature_save($product); // We need a new pfid
           }
 
           $product->fee_amount = $value['amount'];
@@ -448,7 +449,6 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
           // If number intervals is negative, it means that it's unlimited intervals.
           $product->number_intervals = !empty($value['number_intervals']) ? $value['number_intervals'] : -1;
           $product->nid = $node->nid;
-          uc_recurring_product_feature_save($product);
 
           // Create a model that hopefully will be unique.
           $model = 'sub-'. $node->nid .'-'. $product->pfid;
@@ -480,14 +480,14 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
           $adj->model = $model;
           drupal_write_record('uc_product_adjustments', $adj);
 
-          // using the pfid
+          // If the model has changed we save the feature again.
           if ($model != $product->model) {
             $product->model = $model;
-            uc_recurring_product_feature_save($product);
           }
-          $features[] = $product->pfid;
+          $features[$product->pfid] = $product;
         }
 
+        // If there is only one option then don't make selection required.
         $attribute->required = (count($form_state['values']['recurring']) <= 1) ? 0 : 1;
 
         // We need to calculate the option prices adjustments.
@@ -496,8 +496,14 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
         }
         // Save the product attribute and options.
         uc_attribute_subject_save($attribute, 'product', $node->nid, TRUE);
+        // Save the product features.
+        foreach ($features as $feature) {
+          uc_recurring_product_feature_save($features);
+        }
+        // Save the product/node.
         node_save($node);
       }
+      dsm($features);
       break;
   }
   $form_state['redirect'] = 'admin/store/subscriptions';
