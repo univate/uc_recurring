@@ -506,6 +506,7 @@ function uc_recurring_process_order($order, $data = array()) {
         'nid' => $product_fee->nid,
         'qty' => $product['product']->qty,
         'recurring orders' => array(),
+        'extension' => 0,
       ) + $data;
       $fee->attempts = 0;
       $fee->pfid = $product_fee->pfid;
@@ -673,6 +674,7 @@ function uc_recurring_process_extensions(&$fee) {
 function uc_recurring_extend_fee(&$fee, $extend_seconds) {
   $fee->attempts++;
   $fee->next_charge += $extend_seconds;
+  $fee->data['extension'] += $extend_seconds;
   if ($extend_seconds <= 0) {
     $fee->remaining_intervals = 0;
   }
@@ -1528,7 +1530,7 @@ function uc_recurring_get_fee_ops($context, $fee) {
  *   The fee object passed by reference.
  */
 function uc_recurring_set_intervals(&$fee) {
-  $fee->next_charge = strtotime('+'. $fee->regular_interval);
+  $fee->next_charge = strtotime('+'. $fee->regular_interval) - $fee->data['extension'];
   if ($fee->remaining_intervals > 0) {
     $fee->remaining_intervals--;
   }
@@ -1537,5 +1539,6 @@ function uc_recurring_set_intervals(&$fee) {
   }
   $fee->charged_intervals++;
   $fee->attempts = 0;
+  $fee->data['extension'] = 0;
 }
 
