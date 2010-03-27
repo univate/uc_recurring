@@ -590,6 +590,73 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
  */
 function uc_recurring_subscription_subscriber_list($form_state, $product_id = -1) {
   $form = array();
+
+  $header = array(t('Product'), t('Subscribers'), '');
+
+  $result = db_query("SELECT count(u.uid) AS num_users, n.title, n.nid
+                      FROM {uc_recurring_users} u
+                        LEFT JOIN {uc_recurring_products} p ON p.pfid = u.pfid
+                        LEFT JOIN {uc_recurring_subscription} s ON s.nid = p.nid
+                        LEFT JOIN {node} n ON n.nid = p.nid
+                      WHERE u.remaining_intervals <> 0
+                      GROUP BY n.nid");
+
+  while ($subscribers = db_fetch_object($result)) {
+    if (!isset($subscribers->title)) {
+      $subscribers->title = t('Unknown product');
+    }
+    $row = array(
+      'title' => $subscribers->title,
+      'count' => $subscribers->num_users,
+      'ops' => isset($subscribers->nid) ? l('subscribers', 'admin/store/subscriptions/subscribers/'. $subscribers->nid) : '',
+    );
+    $rows[] = $row;
+  }
+  if (count($rows) <= 0) {
+    $rows[] = array(
+      array(
+        'data' => t('No subscribers to any subscription products.'),
+        'colspan' => count($header),
+      ),
+    );
+  }
+  $form['list'] = array(
+    '#value' => theme('table', $header, $rows),
+  );
+
+  if (is_numeric(arg(4))) {
+    $header = array(
+      array('data' => t('User'), 'field' => 'u.name'),
+      array('data' => t('Subscription Started'), 'field' => 'ru.created'),
+      array('data' => t('Next Renewal'), 'field' => 'ru.next_charge'),
+      array('data' => t('Price'))
+    );
+    $sql = "SELECT u.*, ru.*
+            FROM {users} u
+              LEFT JOIN {uc_recurring_users} ru ON ru.uid = u.uid
+              LEFT JOIN {uc_recurring_products} p ON p.pfid = ru.pfid
+              LEFT JOIN {uc_recurring_subscription} s ON s.nid = p.nid
+              LEFT JOIN {node} n ON n.nid = p.nid
+            WHERE ru.remaining_intervals <> 0 AND n.nid = %d";
+
+    $sql .= tablesort_sql($header);
+    $result = pager_query($sql, 20, 0, NULL, arg(4));
+
+    while ($account = db_fetch_object($result)) {
+      $user_rows[] = array(
+        'user' => $account->name,
+        'start' => format_date($account->created),
+        'next' => format_date($account->next_charge),
+        'price' => uc_price($account->fee_amount, array()),
+        //'status' => uc_recurring_state($account->status),
+      );
+    }
+
+    $form['users'] = array(
+      '#value' => theme('table', $header, $user_rows) . theme('pager', NULL, 20, 0),
+    );
+  }
+
   return $form;
 }
 
