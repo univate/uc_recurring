@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_hosted.module,v 1.1.2.11 2010/02/26 15:41:20 univate Exp $
+// $Id: uc_recurring_hosted.module,v 1.1.2.12 2010/03/27 10:03:03 univate Exp $
 
 /**
  * @file
@@ -22,6 +22,7 @@ function uc_recurring_hosted_menu() {
     $items['uc_recurring_hosted/paypal/ipn/%'] = array(
       'title' => 'PayPal IPN',
       'page callback' => 'uc_recurring_hosted_paypal_ipn',
+      'page arguments' => array(3),
       'access callback' => 'uc_paypal_ipn_access',
       'type' => MENU_CALLBACK,
       'file' => 'uc_recurring_hosted.paypal_ipn.inc'
@@ -78,6 +79,7 @@ function uc_recurring_hosted_recurring_info() {
       'fee handler' => 'paypal_wps',
       'module' => 'uc_recurring_hosted',
       'process callback' => 'uc_recurring_hosted_paypal_wps_process',
+      'renew callback' => 'uc_recurring_hosted_paypal_wps_renew',
       'own handler' => TRUE,
       'menu' => array(
         'cancel' => array(
@@ -94,6 +96,8 @@ function uc_recurring_hosted_recurring_info() {
       'fee handler' => 'paypal_wpp',
       'module' => 'uc_recurring',
       'process callback' => 'uc_recurring_paypal_wpp_process',
+      'renew callback' => 'uc_recurring_hosted_paypal_wpp_renew',
+      'own handler' => TRUE,
       'cancel callback' => 'uc_recurring_paypal_wpp_cancel',
       'menu' => array(
         'charge' => UC_RECURRING_MENU_DISABLED,
@@ -104,22 +108,6 @@ function uc_recurring_hosted_recurring_info() {
   }
 
   return $items;
-}
-
-/**
- * Implementation of hook_payment_gateway_alter().
- *
- * Register own payment gateway instead of the PayPal pro.
- * @see uc_paypal_payment_gateway().
- */
-function uc_recurring_hosted_payment_gateway_alter(&$gateways) {
- foreach ($gateways as &$gateway) {
-   if ($gateway['id'] == 'paypal_wpp') {
-     // Change the callback.
-     $gateway['credit'] = 'uc_recurring_hosted_uc_paypal_wpp_charge';
-     break;
-   }
- }
 }
 
 /**
@@ -476,9 +464,9 @@ function uc_recurring_hosted_authorizenet_arb_update_form_submit(&$form, &$form_
  */
 function uc_recurring_hosted_paypal_wps_process($order, &$fee) {
   // the recurring payment is setup at the time of product purchase
-  $subscr_id = check_plain($_POST['subscr_id']);
-  if ($subscr_id) {
-    $fee->data['subscr_id'] = $subscr_id;
+  if (!empty($_POST['subscr_id'])) {
+    $fee->data['subscr_id'] = $_POST['subscr_id'];
+    uc_order_update_status($order->order_id, 'paypal_pending');
     return TRUE;
   }
   return FALSE;
@@ -518,6 +506,7 @@ function uc_recurring_hosted_form_uc_paypal_wps_form_alter(&$form, $form_state) 
     $data['a1'] = sprintf("%0.2f", $order->order_total);
     $data['p1'] = $p;
     $data['t1'] = strtoupper($t[0]);
+
     // recurring payments
     list($p, $t) = explode(' ', $recurring_fee['recurring product']->regular_interval);
     $data['a3'] = sprintf("%0.2f", $recurring_fee['recurring product']->fee_amount == 0 ? $recurring_fee['product']->price : $recurring_fee['recurring product']->fee_amount);
@@ -549,56 +538,28 @@ function uc_recurring_hosted_paypal_cancel_form($form_state, $rfid) {
 }
 
 /**
- * Paypal pro charge handler.
+ * Setup a mock renew handler to process through UC Recurring.
+ *
+ * @param $order
+ *   Order object.
+ * @param $fee
+ *   Recurring fee object.
+ * @return
+ *   TRUE if the payment has been received.
  */
-function uc_recurring_hosted_uc_paypal_wpp_charge($order_id, $amount, $data) {
-  global $user;
-
-  $success = TRUE;
-
-  $order = uc_order_load($order_id);
-  if (uc_recurring_get_recurring_products_in_order($order)) {
-    if ($fees = uc_recurring_process_order($order, array('amount' => $amount, 'data' => $data))) {
-      foreach ($fees as $fee) {
-        $fee = uc_recurring_fee_user_load($fee);
-        if (!empty($fee->data['npv result']['subscription_id'])) {
-          // Add the subscription Id.
-          uc_recurring_hosted_subscription_save($fee->rfid, $fee->data['npv result']['subscription_id']);
-        }
-        else {
-          // We don't break here, as there might be some success fees that need
-          // to be registered.
-          $success = FALSE;
-        }
-      }
-    }
-    else {
-      $success = FALSE;
-    }
-
-    // Check if we have non-recurring products left.
-    if ($balance = uc_payment_balance($order)) {
-      $non_recurring = uc_paypal_wpp_charge($order_id, $balance, $data);
-      $success = $success  & $non_recurring['success'];
-    }
-
-    // There's was an error so return failure to uc_payment_process().
-    return array(
-      'success' => $success ,
-      'message' => $success ? t('PayPal pro payment successed.') : t('PayPal pro payment failed.'),
-      'uid' => $user->uid,
-    );
-
+function uc_recurring_hosted_paypal_wps_renew($order, &$fee) {
+  module_load_include('inc', 'uc_recurring_hosted', 'uc_recurring_hosted.paypal_ipn');
+  $fee->ipn->order_id = $order->order_id;
+  _uc_recurring_hosted_paypal_ipn_payment($fee->ipn);
+  if ($fee->ipn->payment_status == 'Completed') {
+    return TRUE;
   }
-  else {
-    // In case of some error, make sure the balance is updated.
-    $balance = uc_payment_balance($order);
-    // There are no recurring products, so use the default callback.
-    return uc_paypal_wpp_charge($order_id, $balance, $data);
-  }
+  return FALSE;
 }
 
-
+/******************************************************************************
+ * PAYPAL WPP
+ *****************************************************************************/
 
 /**
  * PayPal website payments pro process.
@@ -778,34 +739,32 @@ function uc_recurring_paypal_wpp_process($order, &$fee) {
           '@type' => $types[$data['txn_type']],
         ),
         WATCHDOG_WARNING,
-        l(t('view order'), 'admin/store/orders/'. $order_id)
+        l(t('view order'), 'admin/store/orders/'. $fee->order_id)
       );
     // Fall through.
     case 'Success':
-      $message = t('<b>@type</b><br /><b>Success: </b>@amount @currency', array('@type' => $types[$data['txn_type']], '@amount' => uc_price($nvp_request['AMT'], $context, array('sign' => FALSE)), '@currency' => $nvp_response['CURRENCYCODE']));
-      if ($data['txn_type'] != UC_CREDIT_PRIOR_AUTH_CAPTURE) {
-        $message .= '<br />'. t('<b>Address:</b> @avscode', array('@avscode' => _uc_paypal_avscode_message($nvp_response['AVSCODE'])));
-        if (variable_get('uc_credit_cvv_enabled', TRUE)) {
-          $message .= '<br />'. t('<b>CVV2:</b> @cvvmatch', array('@cvvmatch' => _uc_paypal_cvvmatch_message($nvp_response['CVV2MATCH'])));
-        }
-      }
+      $message = t('<b>Recurring Payment Setup</b><br /><b>Recurring Success: </b>@amount @currency', array('@amount' => uc_price($nvp_request['AMT'], $context, array('sign' => FALSE)), '@currency' => $nvp_response['CURRENCYCODE']));
+
       $result = array(
         'success' => TRUE,
         'comment' => t('PayPal transaction ID: @transactionid', array('@transactionid' => $nvp_response['TRANSACTIONID'])),
         'message' => $message,
         'data' => check_plain($nvp_response['TRANSACTIONID']),
         'uid' => $user->uid,
-        // We place the subscription ID, and it will be saved in
-        // uc_recurring_hosted_uc_paypal_wpp_charge(), as we still don't have
-        // the recurring fee ID.
-        'subscription_id' => $nvp_response['PROFILEID'],
       );
 
+      //we need to save the rfid, we don't have it yet
+      if (!$fee->rfid) {
+        $fee->rfid = uc_recurring_fee_user_save($fee);
+      }
+
+      //save the subscription so we have the information
+      uc_recurring_hosted_subscription_save($fee->rfid, $nvp_response['PROFILEID']);
 
       // If this was an authorization only transaction..
       if ($data['txn_type'] == UC_CREDIT_AUTH_ONLY) {
         // Log the authorization to the order.
-        uc_credit_log_authorization($order_id, $nvp_response['TRANSACTIONID'], $nvp_response['AMT']);
+        uc_credit_log_authorization($fee->order_id, $nvp_response['TRANSACTIONID'], $nvp_response['AMT']);
       }
       elseif ($data['txn_type'] == UC_CREDIT_PRIOR_AUTH_CAPTURE) {
         uc_credit_log_prior_auth_capture($order_id, $data['auth_id']);
@@ -845,10 +804,10 @@ function uc_recurring_paypal_wpp_process($order, &$fee) {
       break;
   }
 
-  uc_order_comment_save($order_id, $user->uid, $message, 'admin');
+  uc_order_comment_save($fee->order_id, $user->uid, $message, 'admin');
 
   // Log this only if payment money wasn't actually captured.
-  if(!empty($result['success']) && !in_array($data['txn_type'], array(UC_CREDIT_AUTH_ONLY))) {
+  if (!empty($result['success']) && !in_array($data['txn_type'], array(UC_CREDIT_AUTH_ONLY))) {
     // The transaction was successful. We need to populate some data in the
     // fee object, as we are now returning to uc_recurring_process_order()
     // and the result (e.g. the mesasge and the user ID) need to be passed back
@@ -912,7 +871,7 @@ function uc_recurring_paypal_wpp_cancel($fee) {
 function uc_paypal_recurring_update($order, $fee, $updates = array()) {
   global $user;
 
-  watchdog('uc_paypal_recurring_update', print_r($fee, 1), null, WATCHDOG_DEBUG);
+  watchdog('uc_paypal_recurring_update', print_r($fee, 1), NULL, WATCHDOG_DEBUG);
 
   // Build an NVP request.
   $nvp_request = array(
@@ -956,4 +915,24 @@ function uc_recurring_paypal_get_profile($rfid) {
   }
 
   return $nvp_response;
+}
+
+/**
+ * Setup a mock renew handler to process through UC Recurring.
+ *
+ * @param $order
+ *   Order object.
+ * @param $fee
+ *   Recurring fee object.
+ * @return
+ *   TRUE if payment has been received.
+ */
+function uc_recurring_hosted_paypal_wpp_renew($order, &$fee) {
+  module_load_include('inc', 'uc_recurring_hosted', 'uc_recurring_hosted.paypal_ipn');
+  $fee->ipn->order_id = $order->order_id;
+  _uc_recurring_hosted_paypal_ipn_payment($fee->ipn);
+  if ($fee->ipn->payment_status == 'Completed') {
+    return TRUE;
+  }
+  return FALSE;
 }
