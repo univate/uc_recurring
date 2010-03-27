@@ -38,7 +38,7 @@ function uc_recurring_subscription_overview() {
 
     // roles
     if (!empty($product->subscription)) {
-      $product_roles = array_intersect_key($roles, $product->subscription->roles);
+      $product_roles = array_intersect_key($roles, $product->subscription->roles['subscribe_grant']);
     }
     // payment options
     $products = _uc_recurring_subscription_get_product_features($node->nid);
@@ -238,13 +238,28 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
     );
   }
   else {
-    $form['role']['subscribe'] = array(
+    $form['role']['subscribe_grant'] = array(
       '#type' => 'select',
-      '#title' => 'Role awarded at subscription purchase',
+      '#title' => 'Role granted at subscription purchase',
       '#options' => $roles,
       '#multiple' => TRUE,
-      '#default_value' => $node->subscription->roles,
+      '#default_value' => $node->subscription->roles['subscribe_grant'],
     );
+    $form['role']['expire_grant'] = array(
+      '#type' => 'select',
+      '#title' => 'Role granted at subscription expiration',
+      '#options' => $roles,
+      '#multiple' => TRUE,
+      '#default_value' => $node->subscription->roles['expire_grant'],
+    );
+    $form['role']['expire_revoke'] = array(
+      '#type' => 'select',
+      '#title' => 'Role revoked at subscription purchase',
+      '#options' => $roles,
+      '#multiple' => TRUE,
+      '#default_value' => $node->subscription->roles['expire_revoke'],
+    );
+
   }
 
 /*
@@ -486,7 +501,11 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
 
         $subscription = new stdClass();
         $subscription->nid = $node->nid;
-        $subscription->roles = $form_state['values']['subscribe'];
+        $subscription->roles = array(
+          'subscribe_grant' => $form_state['values']['subscribe_grant'],
+          'expire_grant' => $form_state['values']['expire_grant'],
+          'expire_revoke' => $form_state['values']['expire_revoke'],
+        );
         $key = empty($node->subscription) ? NULL : 'nid';
         drupal_write_record('uc_recurring_subscription', $subscription, $key);
 

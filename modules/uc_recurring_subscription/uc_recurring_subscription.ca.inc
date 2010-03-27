@@ -71,7 +71,7 @@ function uc_recurring_subscription_ca_predicate() {
 
   // Grant user roles to user when checkout is complete.
   $predicates['uc_recurring_subscription_grant_roles'] = array(
-    '#title' => t('Grant user roles on subscription.'),
+    '#title' => t('Grant user roles on subscription created.'),
     '#trigger' => 'uc_order_status_update',
     '#class' => 'roles',
     '#status' => 1,
@@ -100,15 +100,42 @@ function uc_recurring_subscription_ca_predicate() {
           'order' => 'order',
         ),
         '#settings' => array(
-          'role_option' => 'order',
+          'role_option' => 'subscribe_grant',
           'role' => array(),
         ),
       )
     ),
   );
 
-  // Grant user roles to user when checkout is complete.
-  $predicates['uc_recurring_subscription_revoke_roles'] = array(
+  // Grant user roles to user when subscription expires.
+  $predicates['uc_recurring_subscription_expired_grant_roles'] = array(
+    '#title' => t('Grant user roles on subscription expiration.'),
+    '#trigger' => 'uc_recurring_renewal_expired',
+    '#class' => 'roles',
+    '#status' => 1,
+    '#weight' => 1,
+    '#conditions' => array(
+      '#operator' => 'AND',
+      '#conditions' => array(
+      ),
+    ),
+    '#actions' => array(
+      array(
+        '#name' => 'uc_recurring_subscription_grant_role',
+        '#title' => t('Grant user role(s).'),
+        '#argument_map' => array(
+          'order' => 'order',
+        ),
+        '#settings' => array(
+          'role_option' => 'expire_grant',
+          'role' => array(),
+        ),
+      )
+    ),
+  );
+
+  // Revoke user roles to user when subscription expires.
+  $predicates['uc_recurring_subscription_expired_revoke_roles'] = array(
     '#title' => t('Revoke user roles on subscription expiration.'),
     '#trigger' => 'uc_recurring_renewal_expired',
     '#class' => 'roles',
@@ -127,7 +154,7 @@ function uc_recurring_subscription_ca_predicate() {
           'order' => 'order',
         ),
         '#settings' => array(
-          'role_option' => 'order',
+          'role_option' => 'expire_revoke',
           'role' => array(),
         ),
       )
@@ -152,7 +179,7 @@ function uc_recurring_subscription_action_grant_role($order, $settings) {
   else {
     foreach ($order->products as $pid => $product) {
       $subscription = uc_recurring_subscription_load($product->nid);
-      $account->roles += $subscription->roles;
+      $account->roles += $subscription->roles[$settings['role_option']];
     }
   }
   user_save($account, array('roles' => $account->roles));
@@ -168,7 +195,9 @@ function uc_recurring_subscription_action_grant_role_form($form_state, $settings
     '#title' => t('Where are the role(s) defined?'),
     '#attributes' => array('class' => 'ca-role-select-option'),
     '#options' => array(
-      'order' => t('Set by Recurring Subscription Manager'),
+      'subscribe_grant' => t('Apply the roles set by the Subscription Manager on creation.'),
+      'expire_grant' => t('Apply the roles set by the Subscription Manager on expiration.'),
+      'expire_revoke' => t('Revoke the roles set by the Subscription Manager on expiration.'),
       'custom' => t('Custom selected role (select from below)'),
     ),
     '#default_value' => $settings['role_option'],
@@ -209,7 +238,9 @@ function uc_recurring_subscription_action_revoke_role($order, $settings) {
   else {
     foreach ($order->products as $pid => $product) {
       $subscription = uc_recurring_subscription_load($product->nid);
-      foreach ($subscription->roles as $rid => $role) {
+      foreach ($subscription->roles[$settings['role_option']] as $rid => $role) {
+        // @todo: we need to check other subscriptions to ensure that the role
+        // is no longer required by another subscription.
         unset($account->roles[$rid]);
       }
     }

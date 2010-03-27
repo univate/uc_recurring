@@ -114,3 +114,13 @@ function _uc_recurring_subscription_setup() {
 
   db_query("INSERT INTO {uc_class_attributes} (pcid, aid, label, ordering, required, display) VALUES ('%s', %d, 'Payment Options', 0, 1, 1)", $pcid, $aid);
 }
+
+/**
+ *
+ */
+/*
+function uc_recurring_update_6000() {
+  $ret = array();
+  return $ret;
+}
+*/
