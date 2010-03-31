@@ -1,5 +1,5 @@
 <?php
-// $Id:$
+// $Id$
 
 /**
  * @file
@@ -224,10 +224,16 @@ function uc_recurring_order_pane_checkout($op, &$arg1, $arg2) {
     case 'review':
       if ($arg1->data['recurring_option']) {
         $next_renewal = strtotime('+'. $arg1->data['recurring_option']);
-        $review[] = array('title' =>t(variable_get('uc_recurring_order_pane_title', 'Recurring Order')), 'data' =>t('Your next order after this will occur on @next.', array('@recurring' => $arg1->data['recurring_option'], '@next' => format_date($next_renewal, 'short'))));
+        $review[] = array(
+          'title' => t(variable_get('uc_recurring_order_pane_title', 'Recurring Order')),
+          'data' => t('Your next order after this will occur on @next.', array('@recurring' => $arg1->data['recurring_option'], '@next' => format_date($next_renewal, 'short')))
+        );
       }
       else {
-        $review[] = array('title' =>t(variable_get('uc_recurring_order_pane_title', 'Recurring Order')), 'data' => t(variable_get('uc_recurring_order_pane_empty', 'This order will not repeat.')));
+        $review[] = array(
+          'title' => t(variable_get('uc_recurring_order_pane_title', 'Recurring Order')),
+          'data' => t(variable_get('uc_recurring_order_pane_empty', 'This order will not repeat.'))
+        );
       }
      return $review;
   }
@@ -269,7 +275,7 @@ function uc_recurring_order_process_order($order, $recurring) {
     }
 
     // Create a new fee object.
-    $fee = new StdClass();
+    $fee = new stdClass();
     $fee->uid = $order->uid;
 
     $fee->fee_handler = $fee_handler['fee handler'];
@@ -290,7 +296,7 @@ function uc_recurring_order_process_order($order, $recurring) {
     $fee->charged_intervals = 0;
 
     $products = $order->products;
-    foreach($products as $index => $product) {
+    foreach ($products as $index => $product) {
       unset($products[$index]->order_product_id);
       unset($products[$index]->order_id);
     }
@@ -342,7 +348,7 @@ function uc_recurring_order_form_uc_recurring_admin_edit_form_alter(&$form, $for
   $fee = uc_recurring_fee_user_load($rfid);
 
   if ($fee->data['uc_recurring_order']) {
-    foreach($fee->data['uc_recurring_order']['products'] as $product) {
+    foreach ($fee->data['uc_recurring_order']['products'] as $product) {
       $row = array(
         'title' => $product->title,
         'qty' => $product->qty,

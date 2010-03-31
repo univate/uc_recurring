@@ -43,7 +43,7 @@ function uc_recurring_hosted_paypal_ipn($order_id) {
         if (uc_payment_balance($order) <= 0) {
           // Fetch fee from database.
           $fees = uc_recurring_get_fees($order);
-          foreach($fees as $fee) {
+          foreach ($fees as $fee) {
             $fee->ipn = $ipn;
             uc_recurring_renew($fee);
           }

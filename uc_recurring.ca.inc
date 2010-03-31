@@ -323,7 +323,7 @@ function uc_recurring_ca_trigger() {
  *   The order settings.
  */
 function uc_recurring_condition_order_contains_renewals($order, $settings) {
-  foreach($order->products as $products) {
+  foreach ($order->products as $products) {
     if (!empty($products->data['recurring_fee'])) {
       return TRUE;
     }
