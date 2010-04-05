@@ -38,7 +38,7 @@ function uc_recurring_subscription_overview() {
 
     // roles
     if (!empty($product->subscription)) {
-      $product_roles = array_intersect_key($roles, $product->subscription->roles['subscribe_grant']);
+      $product_roles = array_intersect_key($roles, $product->subscription->access['subscribe_grant']);
     }
     // payment options
     $products = _uc_recurring_subscription_get_product_features($node->nid);
@@ -133,7 +133,7 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
     '#collapsed' => TRUE,
   );
   // We look at the default option for the trial information.
-  $aid = variable_get('uc_recurring_subscription_attribute', ''); 
+  $aid = variable_get('uc_recurring_subscription_attribute', '');
   if (!empty($aid)) {
     $default_option = $node->attributes[$aid]->default_option;
     $name = $node->attributes[$aid]->options[$default_option]->name;
@@ -225,41 +225,86 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
     '#default_value' => $default_option,
   );
 
-  $form['role'] = array(
+  $form['access'] = array(
     '#type' => 'fieldset',
-    '#title' => 'Step Three: Role Assignment',
-    '#description' => t('Select the role(s) which are assigned to members who subscribe to this subscription product and then removed when the subscription expires.'),
+    '#title' => 'Step Three: Access & Permissions',
+    '#description' => t('In this section you can define the access that is granted or removed on subscription creation, renewal and expiration events.'),
   );
-  $roles = user_roles(TRUE);
-  unset($roles[DRUPAL_AUTHENTICATED_RID]);
+
+  // If uc_roles is enabled we will use the settings from this.
+  $roles = array();
+  if (module_exists('uc_roles')) {
+    $roles = _uc_roles_get_choices();
+  }
+  else if (user_access('administer permissions')) {
+    $roles = user_roles(TRUE);
+    unset($roles[DRUPAL_AUTHENTICATED_RID]);
+  }
+
+  $form['access']['role'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Roles',
+    '#description' => t('Select the role(s) which are assigned to members who subscribe to this subscription product and then removed when the subscription expires.'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
   if (empty($roles)) {
-    $form['role']['message'] = array(
+    $form['access']['role']['message'] = array(
       '#value' => t('You need to first add a user role <a href="@role_link">here</a>.', array('@role_link' => url('admin/user/roles'))),
     );
   }
   else {
-    $form['role']['subscribe_grant'] = array(
+    $form['access']['role']['#theme'] = 'uc_recurring_subscription_role_items';
+    $form['access']['role']['subscribe_grant'] = array(
       '#type' => 'select',
-      '#title' => 'Role granted at subscription purchase',
       '#options' => $roles,
       '#multiple' => TRUE,
-      '#default_value' => $node->subscription->roles['subscribe_grant'],
+      '#default_value' => $node->subscription->access['subscribe_grant'],
+      '#attributes' => array('class' => 'role-option'),
+      '#parents' => array('access', 0, 'subscribe_grant'),
     );
-    $form['role']['expire_grant'] = array(
+    $form['access']['role']['expire_grant'] = array(
       '#type' => 'select',
-      '#title' => 'Role granted at subscription expiration',
       '#options' => $roles,
       '#multiple' => TRUE,
-      '#default_value' => $node->subscription->roles['expire_grant'],
+      '#default_value' => $node->subscription->access['expire_grant'],
+      '#attributes' => array('class' => 'role-option'),
+      '#parents' => array('access', 0, 'expire_grant'),
     );
-    $form['role']['expire_revoke'] = array(
+    $form['access']['role']['expire_revoke'] = array(
       '#type' => 'select',
-      '#title' => 'Role revoked at subscription purchase',
       '#options' => $roles,
       '#multiple' => TRUE,
-      '#default_value' => $node->subscription->roles['expire_revoke'],
+      '#default_value' => $node->subscription->access['expire_revoke'],
+      '#attributes' => array('class' => 'role-option'),
+      '#parents' => array('access', 0, 'expire_revoke'),
     );
+  }
 
+  if (module_exists('uc_og_subscribe')) {
+    $form['access']['og'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Organic Groups',
+      '#description' => t('Select which organic groups a user should be subscribed to on a new subscripion purchased or unsubscribed when the subscription expires.'),
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+      '#theme' => 'uc_recurring_subscription_og_items',
+    );
+    $groups = uc_og_subscribe_get_groups();
+    $form['access']['og']['subscribe_gid'] = array(
+      '#type' => 'select',
+      '#default_value' => $node->subscription->access['subscribe_gid'],
+      '#options' => $groups,
+      '#multiple' => TRUE,
+      '#parents' => array('access', 0, 'subscribe_gid'),
+    );
+    $form['access']['og']['unsubscribe_gid'] = array(
+      '#type' => 'select',
+      '#default_value' => $node->subscription->access['unsubscribe_gid'],
+      '#options' => $groups,
+      '#multiple' => TRUE,
+      '#parents' => array('access', 0, 'unsubscribe_gid'),
+    );
   }
 
 /*
@@ -278,13 +323,13 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
 */
 
   if (!empty($node->nid) && $node->type != variable_get('uc_recurring_subscription_product_class', 'uc_recurring_subscription')) {
-    return confirm_form($form, '', uc_referer_uri(), t('This product is not current a subscription, saving this form will convert this product to a subscription product, which could result in data being lost if you have specified custom fields.'), t('Save product and convert to a subscription'), t('Cancel'));
+    return confirm_form($form, '', uc_referer_uri(), t('This product is not a subscription product, saving this form will convert this product to a subscription product, which could result in data being lost if you have specified custom fields.'), t('Save product and convert to a subscription'), t('Cancel'));
   }
   else {
     $form['submit'] = array('#type' => 'submit', '#value' => t('Save'));
   }
 
-  if ($product_id != -1) {
+  if (!isset($product_id)) {
     $form['delete'] = array('#type' => 'submit', '#value' => t('Delete'));
   }
 
@@ -468,6 +513,7 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
       node_delete($form_state['values']['product_id']);
       break;
     default: // Save
+        dsm($form_state['values']);
       if (empty($form_state['values']['product_id'])) {
         $node = new stdClass();
         $node->type = variable_get('uc_recurring_subscription_product_class', 'uc_recurring_subscription');
@@ -499,13 +545,14 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
         // Create product attribute without the options.
         uc_attribute_subject_save($attribute, 'product', $node->nid);
 
-        $subscription = new stdClass();
-        $subscription->nid = $node->nid;
-        $subscription->roles = array(
-          'subscribe_grant' => $form_state['values']['subscribe_grant'],
-          'expire_grant' => $form_state['values']['expire_grant'],
-          'expire_revoke' => $form_state['values']['expire_revoke'],
-        );
+        $subscription = uc_recurring_subscription_load($nid);
+        if (!isset($subscription)) {
+          $subscription = new stdClass();
+          $subscription->nid = $node->nid;
+        }
+        foreach ($form_state['values']['access'][0] as $access => $value) {
+          $subscription->access[$access] = $value;
+        }
         $key = empty($node->subscription) ? NULL : 'nid';
         drupal_write_record('uc_recurring_subscription', $subscription, $key);
 
@@ -776,6 +823,39 @@ function theme_uc_recurring_subscription_products($form) {
 
   $output = theme('table', $header, $rows, array('id' => 'recurring-subscription-products'));
   $output .= '<div><span class="default-option">'. t('default subscription option') .'</span></div>';
+  $output .= drupal_render($form);
+  return $output;
+}
+
+/**
+ *
+ */
+function theme_uc_recurring_subscription_role_items($form) {
+  $header = array(t('Granted on purchase'), t('Granted on expiration'), t('Revoked on expiration'));
+
+  $row = array();
+  $row[] = drupal_render($form['subscribe_grant']);
+  $row[] = drupal_render($form['expire_grant']);
+  $row[] = drupal_render($form['expire_revoke']);
+  $rows[] = $row;
+
+  $output = theme('table', $header, $rows);
+  $output .= drupal_render($form);
+  return $output;
+}
+
+/**
+ *
+ */
+function theme_uc_recurring_subscription_og_items($form) {
+  $header = array(t('Subscribe on purchase'), t('Unsubscribe on expiration'));
+
+  $row = array();
+  $row[] = drupal_render($form['subscribe_gid']);
+  $row[] = drupal_render($form['unsubscribe_gid']);
+  $rows[] = $row;
+
+  $output = theme('table', $header, $rows);
   $output .= drupal_render($form);
   return $output;
 }

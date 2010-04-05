@@ -27,9 +27,10 @@ function uc_recurring_subscription_ca_condition() {
  * Implementation of hook_ca_action().
  */
 function uc_recurring_subscription_ca_action() {
+  // actions to grant/revoke role on user account.
   $actions['uc_recurring_subscription_grant_role'] = array(
     '#title' => t('Grant a role on an order.'),
-    '#category' => t('Recurring'),
+    '#category' => t('Role'),
     '#callback' => 'uc_recurring_subscription_action_grant_role',
     '#arguments' => array(
       'order' => array(
@@ -38,10 +39,9 @@ function uc_recurring_subscription_ca_action() {
       ),
     ),
   );
-
   $actions['uc_recurring_subscription_revoke_role'] = array(
     '#title' => t('Revoke a role on an order.'),
-    '#category' => t('Recurring'),
+    '#category' => t('Role'),
     '#callback' => 'uc_recurring_subscription_action_revoke_role',
     '#arguments' => array(
       'order' => array(
@@ -51,6 +51,31 @@ function uc_recurring_subscription_ca_action() {
     ),
   );
 
+  if (module_exists('uc_og_subscribe')) {
+    // actions to subscribe/unsubscribe user from organic group.
+    $actions['uc_recurring_subscription_subscribe_og'] = array(
+      '#title' => t('Subscribe user to an organic group.'),
+      '#category' => t('Organic Group'),
+      '#callback' => 'uc_recurring_subscription_action_subscribe_og',
+      '#arguments' => array(
+        'order' => array(
+          '#entity' => 'uc_order',
+          '#title' => t('Order'),
+        ),
+      ),
+    );
+    $actions['uc_recurring_subscription_unsubscribe_og'] = array(
+      '#title' => t('Unsubscribe user from organic group.'),
+      '#category' => t('Organic Group'),
+      '#callback' => 'uc_recurring_subscription_action_unsubscribe_role',
+      '#arguments' => array(
+        'order' => array(
+          '#entity' => 'uc_order',
+          '#title' => t('Order'),
+        ),
+      ),
+    );
+  }
   return $actions;
 }
 

@@ -105,6 +105,14 @@ function uc_recurring_subscription_menu() {
     'file' => 'uc_recurring_subscription.admin.inc',
   );
 
+  // override the ability to delete the subscription attribute
+  $items['admin/store/attributes/'. variable_get('uc_recurring_subscription_attribute', '') .'/delete'] = array(
+    'title' => 'Delete operation not Availabe',
+    'page callback' => 'uc_recurring_subscription_attribute_delete',
+    'access arguments' => array('administer attributes'),
+    'type' => MENU_CALLBACK,
+  );
+
   return $items;
 }
 
@@ -115,12 +123,19 @@ function uc_recurring_subscription_menu_alter(&$items) {
 }
 
 /**
+ *
+ */
+function uc_recurring_subscription_attribute_delete() {
+  return t('This attribute cannot be deleted as it is used by the subscrition products to provide payment options.');
+}
+
+/**
  * Load a recurring subscription object.
  */
 function uc_recurring_subscription_load($nid) {
   $subscription = db_fetch_object(db_query("SELECT * FROM {uc_recurring_subscription} WHERE nid = %d", $nid));
   if (isset($subscription)) {
-    $subscription->roles = empty($subscription->roles) ? array() : unserialize($subscription->roles);
+    $subscription->access = empty($subscription->access) ? array() : unserialize($subscription->access);
   }
   return $subscription;
 }
@@ -191,6 +206,12 @@ function uc_recurring_subscription_theme() {
     'uc_recurring_subscription_products' => array(
       'arguments' => array('form' => NULL),
     ),
+    'uc_recurring_subscription_role_items' => array(
+      'arguments' => array('form' => NULL),
+    ),
+    'uc_recurring_subscription_og_items' => array(
+      'arguments' => array('form' => NULL),
+    ),
   );
 }
 
@@ -237,3 +258,20 @@ function _uc_recurring_subscription_product_feature_sort($a, $b) {
   return ($a_weight < $b_weight) ? -1 : 1;
 }
 
+/**
+ * Implementation of hook_form_alter().
+ */
+function uc_recurring_subscription_form_alter(&$form, $form_state, $form_id) {
+  $aid = variable_get('uc_recurring_subscription_attribute', '');
+  if (isset($form['aid']) && $form['aid']['#value'] == $aid) {
+    // Hide critical options from forum vocabulary.
+    if ($form_id == 'uc_attribute_form') {
+      $form['help_subscription_attribute'] = array(
+        '#value' => t('This is the designated subscription product attribute. Some of the normal attribute options have been disabled.'),
+        '#weight' => -1,
+      );
+      $form['name']['#disabled'] = TRUE;
+    }
+
+  }
+}

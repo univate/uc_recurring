@@ -43,7 +43,7 @@ function uc_recurring_subscription_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
-      'roles' => array(
+      'access' => array(
         'description' => t('Serialized list of drupal roles that should be applied on this subscription.'),
         'type' => 'text',
         'serialize' => TRUE,
@@ -78,7 +78,6 @@ function uc_recurring_subscription_schema() {
  */
 function uc_recurring_subscription_install() {
   drupal_install_schema('uc_recurring_subscription');
-  _uc_recurring_subscription_setup();
 }
 
 /**
@@ -86,14 +85,15 @@ function uc_recurring_subscription_install() {
  */
 function uc_recurring_subscription_uninstall() {
   drupal_uninstall_schema('uc_recurring_subscription');
+
+  variable_del('uc_recurring_subscription_product_class');
+  variable_del('uc_recurring_subscription_attribute');
 }
 
 /**
- * Create a product class for subscriptions.
- * @todo - This code is clumpsy and really needs an api in uc_product for
- *         creating a product class and adding attributes.
+ * Implementation hook_enable().
  */
-function _uc_recurring_subscription_setup() {
+function uc_recurring_subscription_enable() {
   $pcid = 'uc_recurring_subscription';
 
   if (db_result(db_query("SELECT count(*) FROM {uc_product_classes} WHERE pcid = '%s'", $pcid)) < 1) {
@@ -105,22 +105,23 @@ function _uc_recurring_subscription_setup() {
   variable_set('node_options_'. $pcid, variable_get('node_options_product', array('status', 'promote')));
   variable_set('uc_recurring_subscription_product_class', $pcid);
 
-  $attribute = $pcid .'_payment_options';
-  if ($aid = db_result(db_query("SELECT aid FROM {uc_attributes} WHERE name = '%s'", $attribute)) < 1) {
-    db_query("INSERT INTO {uc_attributes} (name, label, ordering, required, display, description) VALUES ('%s', 'Payment Options', 0, 1, 1, 'The subscription payment options.')", $attribute);
-    $aid = db_last_insert_id('uc_attributes', 'aid');
-  }
-  variable_set('uc_recurring_subscription_attribute', $aid);
-
-  db_query("INSERT INTO {uc_class_attributes} (pcid, aid, label, ordering, required, display) VALUES ('%s', %d, 'Payment Options', 0, 1, 1)", $pcid, $aid);
+  $attribute = new stdClass();
+  $attribute->name = 'uc_recurring_subscription_payment_options';
+  $attribute->label = 'Payment Option';
+  $attribute->ordering = 0;
+  $attribute->required = 1;
+  $attribute->display = 1;
+  $attribute->description = 'The subscription payment options';
+  uc_attribute_save(&$attribute);
+  uc_attribute_subject_save($attribute, 'class', 'uc_recurring_subscription');
+  variable_set('uc_recurring_subscription_attribute', $attribute->aid);
 }
 
 /**
  *
  */
-/*
-function uc_recurring_update_6000() {
+function uc_recurring_subscription_update_6000() {
   $ret = array();
+  db_change_field($ret, 'uc_recurring_subscription', 'roles', 'access', array('type' => 'text', 'serialize' => TRUE));
   return $ret;
 }
-*/
