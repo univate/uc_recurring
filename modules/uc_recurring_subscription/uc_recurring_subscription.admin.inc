@@ -33,11 +33,11 @@ function uc_recurring_subscription_overview() {
   $form['products']['#theme'] = 'uc_recurring_subscription_products';
   while($node = db_fetch_object($result)) {
     $product = node_load($node->nid);
-
     $attribute = uc_attribute_load(variable_get('uc_recurring_subscription_attribute', ''));
 
     // roles
-    if (!empty($product->subscription)) {
+    $product_roles = array();
+    if (!empty($product->subscription->access['subscribe_grant'])) {
       $product_roles = array_intersect_key($roles, $product->subscription->access['subscribe_grant']);
     }
     // payment options
@@ -513,7 +513,6 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
       node_delete($form_state['values']['product_id']);
       break;
     default: // Save
-        dsm($form_state['values']);
       if (empty($form_state['values']['product_id'])) {
         $node = new stdClass();
         $node->type = variable_get('uc_recurring_subscription_product_class', 'uc_recurring_subscription');
@@ -545,15 +544,16 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
         // Create product attribute without the options.
         uc_attribute_subject_save($attribute, 'product', $node->nid);
 
-        $subscription = uc_recurring_subscription_load($nid);
-        if (!isset($subscription)) {
+        $subscription = uc_recurring_subscription_load($node->nid);
+        if (empty($subscription)) {
           $subscription = new stdClass();
           $subscription->nid = $node->nid;
+          $subscription->new = TRUE;
         }
         foreach ($form_state['values']['access'][0] as $access => $value) {
           $subscription->access[$access] = $value;
         }
-        $key = empty($node->subscription) ? NULL : 'nid';
+        $key = $subscription->new == TRUE ? NULL : 'nid';
         drupal_write_record('uc_recurring_subscription', $subscription, $key);
 
         // add/update the recurring features

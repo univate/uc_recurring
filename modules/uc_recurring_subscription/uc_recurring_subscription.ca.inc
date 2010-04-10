@@ -204,7 +204,7 @@ function uc_recurring_subscription_action_grant_role($order, $settings) {
   else {
     foreach ($order->products as $pid => $product) {
       $subscription = uc_recurring_subscription_load($product->nid);
-      $account->roles += $subscription->roles[$settings['role_option']];
+      $account->roles += $subscription->access[$settings['role_option']];
     }
   }
   user_save($account, array('roles' => $account->roles));

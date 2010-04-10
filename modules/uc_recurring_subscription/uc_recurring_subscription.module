@@ -134,7 +134,7 @@ function uc_recurring_subscription_attribute_delete() {
  */
 function uc_recurring_subscription_load($nid) {
   $subscription = db_fetch_object(db_query("SELECT * FROM {uc_recurring_subscription} WHERE nid = %d", $nid));
-  if (isset($subscription)) {
+  if (!empty($subscription)) {
     $subscription->access = empty($subscription->access) ? array() : unserialize($subscription->access);
   }
   return $subscription;
