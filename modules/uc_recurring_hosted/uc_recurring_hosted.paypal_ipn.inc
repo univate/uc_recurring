@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_hosted.paypal_ipn.inc,v 1.1.2.2 2010/03/27 10:03:03 univate Exp $
+// $Id: uc_recurring_hosted.paypal_ipn.inc,v 1.1.2.3 2010/03/31 03:59:44 univate Exp $
 
 /**
  * @file
@@ -43,7 +43,7 @@ function uc_recurring_hosted_paypal_ipn($order_id) {
         if (uc_payment_balance($order) <= 0) {
           // Fetch fee from database.
           $fees = uc_recurring_get_fees($order);
-          foreach($fees as $fee) {
+          foreach ($fees as $fee) {
             $fee->ipn = $ipn;
             uc_recurring_renew($fee);
           }

@@ -1,8 +1,8 @@
-; $Id: uc_recurring_mock_gateway.info,v 1.1.2.2 2010/02/11 23:58:51 univate Exp $
+; $Id: uc_recurring_mock_gateway.info,v 1.1.2.3 2010/03/31 03:59:44 univate Exp $
 name = Mock Recurring Gateway
-description = Implements mock payment method functions to simulate payment processing when running simpletest in uc_recurring.
+description = NO NOT ENALBE - Implements mock payment method functions to simulate payment processing for simpletests ONLY.
 dependencies[] = uc_payment
-package = Ubercart - payment
+package = Ubercart - recurring
 hidden = TRUE
 core = 6.x
 php = 5.0

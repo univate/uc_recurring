@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.module,v 1.1.4.77 2010/03/31 02:39:31 univate Exp $
+// $Id: uc_recurring.module,v 1.1.4.78 2010/03/31 03:59:44 univate Exp $
 
 /**
  * @file
@@ -102,7 +102,7 @@ function uc_recurring_menu() {
   $info = uc_recurring_get_recurring_info();
   foreach ($info as $handler => $value) {
     if (!empty($value['menu'])) {
-      foreach($value['menu'] as $path => $menu_item) {
+      foreach ($value['menu'] as $path => $menu_item) {
         if ($menu_item != UC_RECURRING_MENU_DISABLED) {
           if ($menu_item == UC_RECURRING_MENU_DEFAULT) {
             $menu_item = !empty($info['default']['menu'][$path]) ? $info['default']['menu'][$path] : array();
@@ -279,7 +279,7 @@ function uc_recurring_cron() {
   if (variable_get('uc_recurring_trigger_renewals', TRUE)) {
     $fees = uc_recurring_get_fees_for_renew();
     if (!empty($fees)) {
-      foreach($fees as $fee) {
+      foreach ($fees as $fee) {
         if ($order_id = uc_recurring_renew($fee)) {
           $success++;
         }
@@ -294,7 +294,7 @@ function uc_recurring_cron() {
 
   $fees = uc_recurring_get_fees_for_expiration();
   if (!empty($fees)) {
-    foreach($fees as $fee) {
+    foreach ($fees as $fee) {
       uc_recurring_expire($fee);
     }
     watchdog('uc_recurring', '@count recurring fees expired successfully.', array('@count' => count($fees)));
@@ -475,7 +475,7 @@ function uc_recurring_process_order($order, $data = array()) {
     $return = array();
 
     // Create a new fee object.
-    $fee = new StdClass();
+    $fee = new stdClass();
     $fee->uid = $order->uid;
 
     $fee->fee_handler = $fee_handler['fee handler'];
@@ -603,8 +603,8 @@ function uc_recurring_renew($fee) {
     $new_order = uc_order_load($new_id);
 
     // Add a comment in the old and new order history.
-    uc_order_comment_save($old_id, $user->uid, t('New recurring fee processed, new order is <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'.$new_id), '@order_id' => $new_id)));
-    uc_order_comment_save($new_id, $user->uid, t('Order created as a recurring fee for order <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'.$old_id), '@order_id' => $old_id)));
+    uc_order_comment_save($old_id, $user->uid, t('New recurring fee processed, new order is <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'. $new_id), '@order_id' => $new_id)));
+    uc_order_comment_save($new_id, $user->uid, t('Order created as a recurring fee for order <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'. $old_id), '@order_id' => $old_id)));
 
     // Set new intervals.
     uc_recurring_set_intervals($fee);
@@ -632,7 +632,7 @@ function uc_recurring_renew($fee) {
 
     ca_pull_trigger('uc_recurring_renewal_failed', $order, $fee);
 
-    uc_order_comment_save($old_id, $user->uid, t('New recurring fee failed on order <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'.$new_id), '@order_id' => $new_id)));
+    uc_order_comment_save($old_id, $user->uid, t('New recurring fee failed on order <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'. $new_id), '@order_id' => $new_id)));
   }
   return FALSE;
 }
@@ -734,7 +734,7 @@ function uc_recurring_save_extensions($extensions, $fee_id = NULL) {
 
   $extend = explode(',', $extensions);
   $count = 0;
-  foreach($extend as $days_to_extend) {
+  foreach ($extend as $days_to_extend) {
     $seconds = $days_to_extend * (24*60*60);
     db_query("INSERT INTO {uc_recurring_extensions} (rebill_attempt, time_to_extend) VALUES (%d, %d)", $count, $seconds);
     $count++;
@@ -966,7 +966,7 @@ function uc_recurring_fee_cancel($rfid, $fee = NULL) {
   uc_recurring_invoke($fee->fee_handler, 'cancel callback', array($fee));
 
   // Add comment about cancellation in the product.
-  uc_order_comment_save($fee->order_id, $user->uid, t('<a href="@user-link">@user</a> cancelled recurring fee <a href="@fee-link">@fee</a>. There were @remaining fee(s) still pending.', array('@user-link' => url('user/'. $user->uid), '@user' => $user->name, '@fee-link' => url('admin/store/orders/recurring/view/fee/'. $rfid), '@fee'=> $rfid, '@remaining' => $remaining < 0 ? 'unlimited' : $remaining)));
+  uc_order_comment_save($fee->order_id, $user->uid, t('<a href="@user-link">@user</a> cancelled recurring fee <a href="@fee-link">@fee</a>. There were @remaining fee(s) still pending.', array('@user-link' => url('user/'. $user->uid), '@user' => $user->name, '@fee-link' => url('admin/store/orders/recurring/view/fee/'. $rfid), '@fee' => $rfid, '@remaining' => $remaining < 0 ? 'unlimited' : $remaining)));
 
   // Let other modules act on the canceled fee.
   module_invoke_all('uc_recurring_cancel', $fee);
@@ -1023,7 +1023,7 @@ function uc_recurring_get_fees_for_renew() {
  */
 function uc_recurring_get_fees_for_expiration() {
   $fees= array();
-  $result = db_query("SELECT * FROM {uc_recurring_users} WHERE remaining_intervals = 0 AND next_charge <= %d AND own_handler = 0 AND status != %d ORDER BY order_id DESC", time(), UC_RECURRING_FEE_STATUS_EXPIRED);
+  $result = db_query("SELECT * FROM {uc_recurring_users} WHERE remaining_intervals = 0 AND next_charge <= %d AND own_handler = 0 AND status <> %d ORDER BY order_id DESC", time(), UC_RECURRING_FEE_STATUS_EXPIRED);
   while ($fee = db_fetch_object($result)) {
     $fee->data = unserialize($fee->data);
     $fees[$fee->rfid] = $fee;
@@ -1063,7 +1063,7 @@ function uc_recurring_get_all_fees($pager = FALSE, $order = '') {
  */
 function uc_recurring_get_user_fees($uid) {
   $fees= array();
-  $result = db_query("SELECT * FROM {uc_recurring_users} WHERE uid = %d AND remaining_intervals != 0 ORDER BY order_id DESC", $uid);
+  $result = db_query("SELECT * FROM {uc_recurring_users} WHERE uid = %d AND remaining_intervals <> 0 ORDER BY order_id DESC", $uid);
   while ($fee = db_fetch_object($result)) {
     $fees[$fee->rfid] = $fee;
   }
@@ -1091,7 +1091,7 @@ function uc_recurring_get_recurring_products_in_order($order) {
     $fees = uc_recurring_get_fees($order);
     foreach ($order->products as $value) {
       $processed = FALSE;
-      foreach($fees as $fee) {
+      foreach ($fees as $fee) {
         if ($fee->order_product_id == $value->order_product_id) {
           $processed = TRUE;
         }
@@ -1507,7 +1507,7 @@ function uc_recurring_get_fee_ops($context, $fee) {
   $ops = array();
   $info = uc_recurring_get_recurring_info($fee->fee_handler);
   if (!empty($info['menu'])) {
-    foreach($info['menu'] as $path => $menu) {
+    foreach ($info['menu'] as $path => $menu) {
       if ($menu != UC_RECURRING_MENU_DISABLED) {
         if ($context == 'fee_admin') {
           $full_path = 'admin/store/orders/recurring/'. $fee->rfid .'/'. $path .'/'. $info['fee handler'];

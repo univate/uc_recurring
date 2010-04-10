@@ -1,5 +1,5 @@
-; $Id: uc_recurring.info,v 1.1.4.1 2009/09/03 04:55:36 univate Exp $
-name = Recurring Fees
+; $Id: uc_recurring.info,v 1.1.4.2 2010/03/31 03:59:44 univate Exp $
+name = Recurring Payments
 description = Assign recurring fees to products and manage them. Should be used with a payment service that implements a recurring fee handler.
 dependencies[] = ca
 package = Ubercart - recurring

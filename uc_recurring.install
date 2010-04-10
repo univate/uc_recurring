@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.install,v 1.1.4.9 2010/03/01 11:30:17 univate Exp $
+// $Id: uc_recurring.install,v 1.1.4.10 2010/03/31 03:59:44 univate Exp $
 
 /**
  * @file
@@ -171,7 +171,7 @@ function uc_recurring_schema() {
         'description' => 'The product ID.',
         'type' => 'int',
         'unsigned' => TRUE,
-        'not null' => TRUE,
+        'not null' => FALSE,
         'default' => 0,
       ),
       'own_handler' => array(
@@ -494,5 +494,14 @@ function uc_recurring_update_6008() {
   
   db_query("UPDATE {uc_recurring_extensions} set rebill_attempt=rebill_attempt-1");
   
+  return $ret;
+}
+
+/**
+ * Allow product ID to be NULL if this recurring fee is not for a specific product.
+ */
+function uc_recurring_update_6009() {
+  $ret = array();
+  db_change_field($ret, 'uc_recurring_users', 'order_product_id', 'order_product_id', array('type' => 'int', 'size' => 'small', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => 0));
   return $ret;
 }
