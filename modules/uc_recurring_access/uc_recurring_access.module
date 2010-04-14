@@ -188,6 +188,9 @@ function uc_recurring_access_node_form($form_state, $node) {
   return $form;
 }
 
+/**
+ *
+ */
 function uc_recurring_access_node_form_submit($form, &$form_state) {
   $nid = $form_state['values']['nid'];
 
@@ -252,27 +255,33 @@ function uc_recurring_access_access($op, $node, $account) {
  *
  * @see uc_recurring_process_order
  */
-function uc_recurring_access_recurring_fee_user_create(&$fee) {
-  uc_recurring_access_recurring_renewal_completed(NULL, $fee);
+function uc_recurring_access_order($op, &$order, $arg2) {
+  if ($op == 'submit') {
+    $fees = uc_recurring_get_fees($order);
+    foreach ($fees as $fee) {
+      uc_recurring_access_recurring_renewal_completed($order, $fee);
+    }
+  }
 }
 
 /**
- * Implements hook_recurring_renewal_completed(&$order, &$fee)
+ * Implements hook_recurring_renewal_completed()
  *
  * @see uc_recurring_renew()
  */
 function uc_recurring_access_recurring_renewal_completed(&$order, &$fee) {
   $product = uc_recurring_fee_product_load($fee->pfid);
-  
   $access = uc_recurring_access_user_load($fee->uid, 'node', $product->nid);
   if (empty($access)) {
     $access = new stdClass();
     $access->uid = $fee->uid;
     $access->created = time();
     $access->access_type = 'node';
-    $access->id = $product_nid;
+    $access->id = $product->nid;
+    $access->new = TRUE;
+    $access->time_applied = 0;
   }
-  $access->time_applied += time() - $fee->next_charge;
+  $access->time_applied += $fee->next_charge - time();
   uc_recurring_access_user_save($access);
 }
 
@@ -280,9 +289,12 @@ function uc_recurring_access_recurring_renewal_completed(&$order, &$fee) {
  * Save a access rule for a user.
  */
 function uc_recurring_access_user_save($access) {
-  $key = array('uid', 'access_type', 'id');
-  if (drupal_write_record('uc_recurring_access_user', $access, $key) === FALSE) {
+  if ($access->new) {
     drupal_write_record('uc_recurring_access_user', $access);
+  }
+  else {
+    $key = array('uid', 'access_type', 'id');
+    drupal_write_record('uc_recurring_access_user', $access, $key);
   }
 }
 
