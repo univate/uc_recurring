@@ -116,10 +116,10 @@ function uc_recurring_access_node_form($form_state, $node) {
   $form['recurring_access']['#theme'] = 'uc_recurring_access_items_items';
   $form['recurring_access']['#tree'] = TRUE;
   // add new rule form
-  $rules = _uc_recurring_access_rules();
+  $rule_types = _uc_recurring_access_rules();
   $form['recurring_access']['new']['access_type'] = array(
     '#type' => 'select',
-    '#options' => array('Add recurring access rule for ...') + $rules,
+    '#options' => array('' => 'Add recurring access rule for ...') + $rule_types,
     '#ahah' => array(
       'event' => 'change',
       'path' => 'uc_recurring_access/ahah/access_type',
@@ -141,10 +141,9 @@ function uc_recurring_access_node_form($form_state, $node) {
   // Get commission structure for this product
   $count = 0;
   $rules = uc_recurring_access_node_load($node->nid);
-  dsm($rules);
   foreach ($rules as $rule) {
     $form['recurring_access'][$count]['access_type'] = array(
-      '#value' => strtoupper($rule->access_type),
+      '#value' => $rule_types[$rule->access_type],
     );
     $form['recurring_access'][$count]['time_required'] = array(
       '#value' => theme('uc_recurring_time', $rule->time_required),
@@ -163,6 +162,17 @@ function uc_recurring_access_node_form($form_state, $node) {
     }
     $form['recurring_access'][$count]['match'] = array(
       '#value' => $value,
+    );
+    $form['recurring_access'][$count]['id'] = array(
+      '#type' => 'hidden',
+      '#value' => $rule->id,
+    );
+    $form['recurring_access'][$count]['access'] = array(
+      '#type' => 'hidden',
+      '#value' => $rule->access_type,
+    );
+    $form['recurring_access'][$count]['delete'] = array(
+      '#type' => 'checkbox',
     );
     $count++;
   }
@@ -192,11 +202,11 @@ function uc_recurring_access_node_form_submit($form, &$form_state) {
   }
 
   // delete the ones that have been checked.
-  foreach ($form_state['values']['recurring_access'] as $pcid => $access) {
+  foreach ($form_state['values']['recurring_access'] as $rule_id => $access) {
     if ($access['delete'] == 1) {
       // delete this record
-      $access_type = $form_state['values']['recurring_access']['new']['access_type'];
-      $id = $form_state['values']['recurring_access']['new']['match'];
+      $access_type = $form_state['values']['recurring_access'][$rule_id]['access'];
+      $id = $form_state['values']['recurring_access'][$rule_id]['id'];
       uc_recurring_access_node_delete($nid, $access_type, $id);
     }
   }
@@ -329,7 +339,7 @@ function uc_recurring_access_node_load($nid) {
  * Delete node access rule.
  */
 function uc_recurring_access_node_delete($nid, $access_type, $id) {
-  db_query("DELETE FROM {uc_recurring_access} 
+  db_query("DELETE FROM {uc_recurring_access_content} 
             WHERE nid = %d AND access_type = '%s' AND id = %d",
             $nid, $access_type, $id);
 
@@ -349,13 +359,14 @@ function _uc_recurring_access_rules() {
  *
  */
 function theme_uc_recurring_access_items_items($form) {
-  $header = array(t('Access type'), t('ID / Object'), t('Purchased time'));
+  $header = array(t('Access type'), t('ID / Object'), t('Purchased time'), t('Delete'));
   $rows = array();
   foreach (element_children($form) as $key) {
     $row = array();
     $row[] = drupal_render($form[$key]['access_type']);
     $row[] = drupal_render($form[$key]['match']);
     $row[] = drupal_render($form[$key]['time_required']);
+    $row[] = drupal_render($form[$key]['delete']);
     $rows[] = $row;
   }
   $output = theme('table', $header, $rows);
@@ -364,7 +375,8 @@ function theme_uc_recurring_access_items_items($form) {
 }
 
 /**
- *
+ * Takes a time in seconds and converts to something more readable.
+ * e.g. 2 weeks 4 days
  */
 function theme_uc_recurring_time($time) {
   $periods = array(
