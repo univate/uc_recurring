@@ -1,0 +1,252 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Provides a way to upgrade a recurring product.
+ *
+ * Initial module development sponsored by Marketing Results
+ * http://www.marketing-results.com.au/
+ */
+
+/**
+ * Implementation hook_menu()
+ */
+function uc_recurring_upgrade_menu() {
+  $items['uc_recurring_upgrade/autocomplete'] = array(
+    'title' => 'Recurring Upgrade Autocomplete',
+    'page callback' => 'uc_recurring_upgrade_autocomplete',
+    'access arguments' => array('administer recurring fees'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['uc_recurring_upgrade/ahah/%'] = array(
+    'page callback' => uc_recurring_upgrade_ahah,
+    'page arguments' => array(2),
+    'access arguments' => array('administer recurring fees'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_product_feature().
+ */
+function uc_recurring_upgrade_product_feature() {
+  $features[] = array(
+    'id' => 'recurring_upgrade',
+    'title' => t('Upgrade recurring fee'),
+    'callback' => 'uc_recurring_upgrade_feature_form',
+    'delete' => 'uc_recurring_upgrade_feature_delete',
+    'settings' => 'uc_recurring_upgrade_settings_form',
+  );
+  return $features;
+}
+
+/**
+ *
+ */
+function uc_recurring_upgrade_feature_form($form_state, $node, $feature) {
+  if (!empty($feature)) {
+    $product = uc_recurring_upgrade_load($feature['pfid']);
+  }
+  /*
+  $sku_options = uc_product_get_models($node);
+  $form['model'] = array(
+    '#type' => 'select',
+    '#title' => t('Applicable SKU'),
+    '#description' => t('Select the applicable product model/SKU when then upgrade will apply to.'),
+    '#options' => $sku_options,
+    '#default_value' => $product->model,
+  );
+  */
+  $form['description'] = array(
+    '#value' => t('This product feature allows you to upgrade a recurring fee. To implement you first need to select the product being upgraded from, if the user purchasing this product has the original recurring product selected on the left below then they will have their recurring fee for that order upgrade to the recurring fee selected below. You can upgrade also upgrade between two recurring options on the same product node (e.g. if you are using an attribute to specifying different recurring options weekly, monthly)'),
+  );
+  $form['product_from'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Only apply if...'),
+    '#description' => t('Select the recurring product being upgraded from.'),
+    '#attributes' => array('style' => 'width: 46%; float: left;')
+  );
+  $form['product_from']['product_from_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product ID'),
+    '#description' => t('Enter product name or ID.'),
+    '#size' => 20,
+    '#autocomplete_path' => 'uc_recurring_upgrade/autocomplete',
+    '#ahah' => array(
+      'event' => 'change',
+      'path' => 'uc_recurring_upgrade/ahah/product_model',
+      'wrapper' => 'product-from-model',
+      'method' => 'replace',
+      'effect' => 'fade',
+      'progress' => array(
+      ),
+    ),
+  );
+  $form['product_from']['product_from_model'] = array(
+    '#value' => '<div id="product-from-model"></div>'
+  );
+
+  $form['product_to'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Upgrade Recurring fee to'),
+    '#description' => t('Select which recurring fee to upgrade to.'),
+    '#attributes' => array('style' => 'width: 46%; float: right;')
+  );
+  $features = uc_product_feature_load_multiple($node->nid);
+  $recurring_options = array();
+  foreach($features as $pfid => $feature) {
+    if ($feature->fid == 'recurring') {
+      $recurring_options[$pfid] = $feature->description;
+    }
+  }
+  if (empty($recurring_options)) {
+    $form['product_to']['add_recurring'] = array(
+      '#value' => t('Need to first create a recurring product feature for this product'),
+    );
+  }
+  else {
+    $form['product_to']['upgrade_pfid'] = array(
+      '#type' => 'radios',
+      '#options' => $recurring_options,
+    );
+  }
+  $form['recurring'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Recurring Settings',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+    '#attributes' => array('style' => 'clear: both;')
+  );
+  $form['recurring']['next_charge'] = array(
+    '#type' => 'select',
+    '#title' => 'Next renewal date',
+    '#options' => array(
+      'same' => t('Keep the next renewal date the same.'),
+      'reset' => t('Reset the renewal date to upgraded date.'),
+    ),
+  );
+  $form['recurring']['upgrade'] = array(
+    '#type' => 'radios',
+    '#title' => t('Upgrade calculation'),
+    '#options' => uc_recurring_upgrade_calculations(),
+    '#default_value' => 'prorata',
+  );
+  return uc_product_feature_form($form);
+}
+
+function uc_recurring_upgrade_feature_form_submit($form, &$form_state) {
+  dsm($form_state);
+
+}
+
+/**
+ *
+ */
+function uc_recurring_upgrade_feature_delete($pfid) {
+
+}
+
+/**
+ *
+ */
+function uc_recurring_upgrade_settings_form() {
+}
+
+
+/**
+ * Autocomplete function for finding recurring products.
+ */
+function uc_recurring_upgrade_autocomplete($string) {
+  $items = array();
+  if (is_numeric($string)) {
+    $sql = "SELECT n.nid, n.title
+            FROM {node} n
+              INNER JOIN {uc_recurring_products} rp ON rp.nid = n.nid
+            WHERE n.nid LIKE '%d%%'";
+  } else {
+    $sql = "SELECT n.nid, n.title
+            FROM {node} n
+              INNER JOIN {uc_recurring_products} rp ON rp.nid = n.nid
+            WHERE n.title LIKE '%s%%'";
+  }
+
+  $result = db_query($sql, $string);
+
+  while($obj = db_fetch_object($result)) {
+    $items[$obj->nid] = check_plain($obj->title) . ' [ID: ' . $obj->nid . ']';
+  }
+  drupal_json($items);
+  exit();
+}
+
+/**
+ * This is just a helper function for handling ahah callbacks.
+ */
+function uc_recurring_upgrade_ahah($context) {
+  $func = '_uc_recurring_upgrade_ahah_'. $context;
+  $form_state['values'] = $_POST;
+  if (function_exists($func)) {
+    $func($form_state);
+  }
+  exit();
+}
+  
+/**
+ * Load the product module options.
+ */
+function _uc_recurring_upgrade_ahah_product_model() {
+  $form_state = array('submitted' => FALSE);
+  $form_build_id = $_POST['form_build_id'];
+  // Add the new element to the stored form. Without adding the element to the
+  // form, Drupal is not aware of this new elements existence and will not
+  // process it. We retreive the cached form, add the element, and resave.
+  $form = form_get_cache($form_build_id, $form_state);
+  $node = node_load($_POST['product_from_id']);
+  if (in_array($node->type, uc_product_types())) {
+    $options = uc_product_get_models($node);
+    $form['product_from']['product_from_model'] = array(
+      '#type' => 'select',
+      '#title' => t('SKU'),
+      '#description' => t('Select the applicable product model/SKU for the product @product.', array('@product' => $node->title)),
+      '#options' => $options,
+    );
+  }
+  else {
+    $form['product_from']['product_from_model'] = array(
+      '#value' => t('No valid product'),
+    );
+  }
+  form_set_cache($form_build_id, $form, $form_state);
+  $form += array(
+    '#post' => $_POST,
+    '#programmed' => FALSE,
+  );
+  // Rebuild the form.
+  $form = form_builder($_POST['form_id'], $form, $form_state);
+
+  // Render the new output.
+  $new_form = $form['product_from']['product_from_model'];
+  $output = drupal_render($new_form);
+
+  drupal_json(array('data' => $output, 'status' => true));
+}
+
+
+function uc_recurring_upgrade_load($pfid) {
+
+}
+
+/**
+ *
+ */
+function uc_recurring_upgrade_calculations() {
+  $calc = array(
+    'prorata' => t('<strong>Pro-rata</strong> - calcuate what is remaining on current plan and what is now due until the next renewal.'),
+    'backpay' => t('<strong>Backpay</strong> - calculate what has been paid already on the customers current plan compared to the difference if they started on the new plan from the start, this difference is charged on upgrade.'),
+  );
+  drupal_alter('recurring_upgrade_calculation', $calc);
+  return $calc;
+}
