@@ -505,3 +505,12 @@ function uc_recurring_update_6009() {
   db_change_field($ret, 'uc_recurring_users', 'order_product_id', 'order_product_id', array('type' => 'int', 'size' => 'small', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => 0));
   return $ret;
 }
+
+/**
+ * Mistake in last update to set size of order_product_field.
+ */
+function uc_recurring_update_6010() {
+  $ret = array();
+  db_change_field($ret, 'uc_recurring_users', 'order_product_id', 'order_product_id', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => 0));
+  return $ret;
+}
