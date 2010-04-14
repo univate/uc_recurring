@@ -567,6 +567,7 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
           }
           else {
             $product = new stdClass();
+            $product->nid = $node->nid;
             uc_recurring_product_feature_save($product); // We need a new pfid
           }
 
@@ -575,7 +576,6 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
           $product->regular_interval = $value['interval_value'] .' '. $value['interval_unit'];
           // If number intervals is negative, it means that it's unlimited intervals.
           $product->number_intervals = !empty($value['number_intervals']) ? $value['number_intervals'] : -1;
-          $product->nid = $node->nid;
 
           // Create a model that hopefully will be unique.
           $model = 'sub-'. $node->nid .'-'. $product->pfid;
