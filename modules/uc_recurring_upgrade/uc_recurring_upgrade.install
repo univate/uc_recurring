@@ -42,6 +42,7 @@ function uc_recurring_upgrade_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
+      ),
       'data' => array(
         'description' => t('Serialized data to upgrade options.'),
         'type' => 'text',
