@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.module,v 1.1.4.78 2010/03/31 03:59:44 univate Exp $
+// $Id: uc_recurring.module,v 1.1.4.79 2010/04/20 06:16:53 univate Exp $
 
 /**
  * @file
@@ -1530,7 +1530,7 @@ function uc_recurring_get_fee_ops($context, $fee) {
  *   The fee object passed by reference.
  */
 function uc_recurring_set_intervals(&$fee) {
-  $fee->next_charge = strtotime('+'. $fee->regular_interval) - $fee->data['extension'];
+  $fee->next_charge = strtotime('+'. $fee->regular_interval, $fee->next_charge) - $fee->data['extension'];
   if ($fee->remaining_intervals > 0) {
     $fee->remaining_intervals--;
   }

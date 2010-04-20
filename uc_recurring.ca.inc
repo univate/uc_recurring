@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.ca.inc,v 1.1.2.7 2010/03/31 03:59:44 univate Exp $
+// $Id: uc_recurring.ca.inc,v 1.1.2.8 2010/04/20 06:57:48 univate Exp $
 
 /**
  * @file
@@ -84,7 +84,7 @@ function uc_recurring_ca_predicate() {
   );
 
   $predicates['uc_recurring_renewal_email_completed'] = array(
-    '#title' => t('Notify customer when a renewal has occured.'),
+    '#title' => t('Notify customer when a renewal has occurred.'),
     '#trigger' => 'uc_recurring_renewal_complete',
     '#class' => 'notification',
     '#status' => 0,
