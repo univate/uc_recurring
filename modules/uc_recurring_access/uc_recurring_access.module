@@ -115,15 +115,20 @@ function uc_recurring_access_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
   // We only block access for the full node, teasers are still accessable.
   if ($op == 'view' && uc_recurring_access_node_has_rules($node)) {
     $teaser = $a3;
-    $result = db_query("SELECT c.nid, u.time_applied, c.time_required
+    $result = db_query("SELECT c.nid, c.access_type, c.id, u.time_applied, c.time_required
                         FROM {uc_recurring_access_content} c
                           LEFT JOIN {uc_recurring_access_user} u ON u.id=c.id AND c.access_type=u.access_type
-                        WHERE c.nid = %d AND u.uid = %d ORDER BY CAST(c.time_required - u.time_applied AS signed)", $node->nid, $user->uid);
+                        WHERE c.nid = %d AND (u.uid = %d OR (c.access_type='role' && c.id = %d))
+                        ORDER BY CAST(c.time_required - u.time_applied AS signed)",
+                        $node->nid, $user->uid, DRUPAL_AUTHENTICATED_RID);
 
     $access = FALSE;
     while ($rule = db_fetch_object($result)) {
       $node->time_required = $rule->time_required;
       $node->time_applied = $rule->time_applied;
+      if ($rule->access_type == 'role' && $rule->id == DRUPAL_AUTHENTICATED_RID) {
+        $rule->time_applied = time() - $user->created;
+      }
       if (($rule->time_applied - $rule->time_required) > 0) {
         $access = TRUE;
         break;
@@ -138,7 +143,7 @@ function uc_recurring_access_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
 }
 
 /**
- *
+ * Form to add/remove recurring access rules for each node.
  */
 function uc_recurring_access_node_form($form_state, $node) {
   drupal_set_title(t('Recurring access rules for @title', array('@title' => $node->title)));
@@ -289,6 +294,27 @@ function uc_recurring_access_recurring_renewal_completed(&$order, &$fee) {
   }
   $access->time_applied += $fee->next_charge - time();
   uc_recurring_access_user_save($access);
+
+  // There is probably a better way of handling role renewals???
+  // We probably should be doing this in the uc_recurring_subscription module via a hook.
+  if (module_exists('uc_recurring_subscription')) {
+    $subscription = uc_recurring_subscription_load($product->nid);
+    // role rules
+    foreach ($subscription->access['subscribe_grant'] as $rid) {
+      $access = uc_recurring_access_user_load($fee->uid, 'role', $rid);
+      if (empty($access)) {
+        $access = new stdClass();
+        $access->uid = $fee->uid;
+        $access->created = time();
+        $access->access_type = 'role';
+        $access->id = $rid;
+        $access->new = TRUE;
+        $access->time_applied = 0;
+      }
+      $access->time_applied += $fee->next_charge - time();
+      uc_recurring_access_user_save($access);
+    }
+  }
 }
 
 /**
