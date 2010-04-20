@@ -99,6 +99,47 @@ function uc_recurring_access_theme() {
 /**
  * Implementation hook_nodeapi()
  */
+function uc_recurring_access_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  global $user;
+
+  // Do not limit access to admin users.
+  if ($user->uid == 1 || user_access('administer recurring content')) {
+    return;
+  }
+
+  $types = variable_get('uc_recurring_access_content_types',array());
+  if (empty($types[$node->type])) {
+    return;
+  }
+
+  // We only block access for the full node, teasers are still accessable.
+  if ($op == 'view' && uc_recurring_access_node_has_rules($node)) {
+    $teaser = $a3;
+    $result = db_query("SELECT c.nid, u.time_applied, c.time_required
+                        FROM {uc_recurring_access_content} c
+                          LEFT JOIN {uc_recurring_access_user} u ON u.id=c.id AND c.access_type=u.access_type
+                        WHERE c.nid = %d AND u.uid = %d ORDER BY CAST(c.time_required - u.time_applied AS signed)", $node->nid, $user->uid);
+
+    $access = FALSE;
+    while ($rule = db_fetch_object($result)) {
+      $node->time_required = $rule->time_required;
+      $node->time_applied = $rule->time_applied;
+      if (($rule->time_applied - $rule->time_required) > 0) {
+        $access = TRUE;
+        break;
+      }
+    }
+    $node->recurring_access = $access;
+    if ($teaser == FALSE && $access == FALSE) {
+      drupal_access_denied();
+      exit;
+    }
+  }
+}
+
+/**
+ *
+ */
 function uc_recurring_access_node_form($form_state, $node) {
   drupal_set_title(t('Recurring access rules for @title', array('@title' => $node->title)));
   if (!uc_recurring_access_content_type($node)) {
@@ -215,41 +256,6 @@ function uc_recurring_access_node_form_submit($form, &$form_state) {
   }
 }
 
-
-
-/**
- * Implementation hook_form_alter()
- */
-function uc_recurring_access_form_alter(&$form, &$form_state, $form_id) {
-  $types = variable_get('uc_recurring_access_content_types',array());
-  $node = $form['#node'];
-  if (!empty($types[$node->type])) {
-    $form['recurring_access'] = array(
-      '#type' => 'fieldset',
-      '#title' => t('Recurring Access'),
-    );
-    $form['recurring_access'][''] = array(
-    );
-    dsm($form);
-    dsm($form_state);
-  }
-}
-
-/**
- *
- */
-function uc_recurring_access_grant() {
-
-}
-
-/**
- * Implementation hook_access()
- */
-function uc_recurring_access_access($op, $node, $account) {
-  //db_query();
-}
-
-
 /**
  * Create the access on a new recurring fee setup.
  *
@@ -300,6 +306,15 @@ function uc_recurring_access_user_save($access) {
 
 /**
  * Load user access rules for this user.
+ *
+ * @param $uid
+ *   User ID.
+ * @param $type
+ *   The access_type e.g. node, role.
+ * @param $id
+ *   The id of the access e.g nid, rid
+ * @return
+ *   The recurring access content rule object.
  */
 function uc_recurring_access_user_load($uid, $type = NULL, $id = NULL) {
   if (!isset($type)) {
@@ -326,10 +341,7 @@ function uc_recurring_access_user_load($uid, $type = NULL, $id = NULL) {
  *   The recurring node access object.
  */
 function uc_recurring_access_node_save($access) {
-  //$key = array('nid', 'access_type', 'id');
-  //if (drupal_write_record('uc_recurring_access_content', $access, $key) === FALSE) {
-    drupal_write_record('uc_recurring_access_content', $access);
-  //}
+  drupal_write_record('uc_recurring_access_content', $access);
 }
 
 /**
@@ -359,6 +371,14 @@ function uc_recurring_access_node_delete($nid, $access_type, $id) {
 }
 
 /**
+ * If a node has no rules then we grant access to everyone.
+ */
+function uc_recurring_access_node_has_rules($node) {
+  $count = db_result(db_query("SELECT count(*) FROM {uc_recurring_access_content} WHERE nid = %d", $node->nid));
+  return ($count > 0);
+}
+
+/**
  * Load the access rules.
  */
 function _uc_recurring_access_rules() {
@@ -368,7 +388,7 @@ function _uc_recurring_access_rules() {
 }
 
 /**
- *
+ * Theme the node recurring access rules in a table.
  */
 function theme_uc_recurring_access_items_items($form) {
   $header = array(t('Access type'), t('ID / Object'), t('Purchased time'), t('Delete'));
