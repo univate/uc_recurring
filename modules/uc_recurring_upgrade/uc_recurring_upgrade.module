@@ -14,16 +14,18 @@
  */
 function uc_recurring_upgrade_menu() {
   $items['uc_recurring_upgrade/autocomplete'] = array(
+    'type' => MENU_CALLBACK,
     'title' => 'Recurring Upgrade Autocomplete',
     'page callback' => 'uc_recurring_upgrade_autocomplete',
     'access arguments' => array('administer recurring fees'),
-    'type' => MENU_CALLBACK,
+    'file' => 'uc_recurring_upgrade.inc'
   );
   $items['uc_recurring_upgrade/ahah/%'] = array(
+    'type' => MENU_CALLBACK,
     'page callback' => uc_recurring_upgrade_ahah,
     'page arguments' => array(2),
     'access arguments' => array('administer recurring fees'),
-    'type' => MENU_CALLBACK,
+    'file' => 'uc_recurring_upgrade.inc'
   );
 
   return $items;
@@ -50,16 +52,6 @@ function uc_recurring_upgrade_feature_form($form_state, $node, $feature) {
   if (!empty($feature)) {
     $product = uc_recurring_upgrade_load($feature['pfid']);
   }
-  /*
-  $sku_options = uc_product_get_models($node);
-  $form['model'] = array(
-    '#type' => 'select',
-    '#title' => t('Applicable SKU'),
-    '#description' => t('Select the applicable product model/SKU when then upgrade will apply to.'),
-    '#options' => $sku_options,
-    '#default_value' => $product->model,
-  );
-  */
   $form['description'] = array(
     '#value' => t('This product feature allows you to upgrade a recurring fee. To implement you first need to select the product being upgraded from, if the user purchasing this product has the original recurring product selected on the left below then they will have their recurring fee for that order upgrade to the recurring fee selected below. You can upgrade also upgrade between two recurring options on the same product node (e.g. if you are using an attribute to specifying different recurring options weekly, monthly)'),
   );
@@ -157,86 +149,10 @@ function uc_recurring_upgrade_settings_form() {
 
 
 /**
- * Autocomplete function for finding recurring products.
+ * Load recurring upgrade feature object from database.
  */
-function uc_recurring_upgrade_autocomplete($string) {
-  $items = array();
-  if (is_numeric($string)) {
-    $sql = "SELECT n.nid, n.title
-            FROM {node} n
-              INNER JOIN {uc_recurring_products} rp ON rp.nid = n.nid
-            WHERE n.nid LIKE '%d%%'";
-  } else {
-    $sql = "SELECT n.nid, n.title
-            FROM {node} n
-              INNER JOIN {uc_recurring_products} rp ON rp.nid = n.nid
-            WHERE n.title LIKE '%s%%'";
-  }
-
-  $result = db_query($sql, $string);
-
-  while($obj = db_fetch_object($result)) {
-    $items[$obj->nid] = check_plain($obj->title) . ' [ID: ' . $obj->nid . ']';
-  }
-  drupal_json($items);
-  exit();
-}
-
-/**
- * This is just a helper function for handling ahah callbacks.
- */
-function uc_recurring_upgrade_ahah($context) {
-  $func = '_uc_recurring_upgrade_ahah_'. $context;
-  $form_state['values'] = $_POST;
-  if (function_exists($func)) {
-    $func($form_state);
-  }
-  exit();
-}
-  
-/**
- * Load the product module options.
- */
-function _uc_recurring_upgrade_ahah_product_model() {
-  $form_state = array('submitted' => FALSE);
-  $form_build_id = $_POST['form_build_id'];
-  // Add the new element to the stored form. Without adding the element to the
-  // form, Drupal is not aware of this new elements existence and will not
-  // process it. We retreive the cached form, add the element, and resave.
-  $form = form_get_cache($form_build_id, $form_state);
-  $node = node_load($_POST['product_from_id']);
-  if (in_array($node->type, uc_product_types())) {
-    $options = uc_product_get_models($node);
-    $form['product_from']['product_from_model'] = array(
-      '#type' => 'select',
-      '#title' => t('SKU'),
-      '#description' => t('Select the applicable product model/SKU for the product @product.', array('@product' => $node->title)),
-      '#options' => $options,
-    );
-  }
-  else {
-    $form['product_from']['product_from_model'] = array(
-      '#value' => t('No valid product'),
-    );
-  }
-  form_set_cache($form_build_id, $form, $form_state);
-  $form += array(
-    '#post' => $_POST,
-    '#programmed' => FALSE,
-  );
-  // Rebuild the form.
-  $form = form_builder($_POST['form_id'], $form, $form_state);
-
-  // Render the new output.
-  $new_form = $form['product_from']['product_from_model'];
-  $output = drupal_render($new_form);
-
-  drupal_json(array('data' => $output, 'status' => true));
-}
-
-
 function uc_recurring_upgrade_load($pfid) {
-
+  return db_fetch_object(db_query("SELECT * FROM {uc_recurring_upgrade_product} WHERE pfid = %d", $pfid));
 }
 
 /**
