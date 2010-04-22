@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.admin.inc,v 1.1.4.12 2010/01/28 21:41:21 univate Exp $
+// $Id: uc_recurring.admin.inc,v 1.1.4.13 2010/04/22 04:43:32 univate Exp $
 
 /**
  * @file
@@ -261,19 +261,16 @@ function uc_recurring_admin_edit_form($form_state, $rfid, $fee_handler) {
       ),
       '#default_value' => $fee->regular_interval_unit,
     );
-
     $form['reset_next_charge'] = array(
       '#type' => 'checkbox',
       '#title' => t('Reset the next charge timer upon form submission using the specified interval.'),
       '#description' => t('This will ignore the next charge field above and instead reset the next charge date to one regular interval from now.'),
     );
-
     $form['submit'] = array(
       '#type' => 'submit',
       '#value' => t('Submit'),
       '#suffix' => l(t('Cancel'), uc_referer_uri()),
     );
-
     return $form;
   }
   else {
@@ -336,3 +333,90 @@ function uc_recurring_admin_edit_form_submit($form, &$form_state) {
   $form_state['redirect'] = 'admin/store/orders/recurring/view/fee/'. $rfid;
 }
 
+/**
+ * Recurring payment settings form.
+ */
+function uc_recurring_payment_form() {
+  $options = array();
+  $methods = uc_recurring_get_recurring_info();
+  foreach ($methods as $fee_handler => $method) {
+    if ($fee_handler == $method['payment method']) {
+      $options[$fee_handler] = $method['name'] .' ('. $method['fee handler'] .')';
+    }
+  }
+  $form['uc_recurring_payment_methods'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Valid payment methods for orders with recurring fees'),
+    '#description' => t('Only selected payment methods will be available for customers purchasing products with recurring fees.<br/>It is up to you to make sure your chosen handler is compatible with the payment methods you select.<br />For example, the uc_recurring handler is only compatible with the Credit Card payment method.'),
+    '#options' => $options,
+    '#default_value' => variable_get('uc_recurring_payment_methods', array()),
+  );
+  $form['uc_recurring_checkout_message'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Recurring fee checkout form message'),
+    '#description' => t('Enter a message to be displayed on the checkout form page when a customer has products in the cart with recurring fees.<br />Leave blank to not display any message.'),
+    '#default_value' => variable_get('uc_recurring_checkout_message', ''),
+  );
+  $form['uc_recurring_trigger_renewals'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable triggered renewals'),
+    '#description' => t('Enable recurring fees to be triggered on cron jobs. Disabling this is a simple way to stop recurring billing from happening for gateways where uc_recurring is responsible for triggering payments (this is especially useful when working on a development copy).'),
+    '#default_value' => variable_get('uc_recurring_trigger_renewals', TRUE),
+  );
+  $form['uc_recurring_checkout_process'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Attempt to process recurring fees during checkout.'),
+    '#description' => t('If not selected, you must have an alternate way of processing fees.<br />With the default handler, this is only possible in credit card debug mode.'),
+    '#default_value' => variable_get('uc_recurring_checkout_process', TRUE),
+  );
+  $form['uc_recurring_checkout_fail'] = array(
+    '#type' => 'radios',
+    '#title' => t('Action to take if a recurring fee fails to process during checkout'),
+    '#description' => t('Regardless of your selection, an admin comment will report the failure.<br/><strong>Note:</strong> Even if you select the first option, checkout will complete if another payment has already been captured.'),
+    '#options' => array(
+      'fail' => t('Return a failed message and do not complete checkout.'),
+      'proceed' => t('Return a failed message but complete checkout.'),
+      'silent' => t('Show no message and complete checkout.'),
+    ),
+    '#default_value' => variable_get('uc_recurring_checkout_fail', 'fail'),
+  );
+
+  $form['extensions'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Extensions'),
+    '#description' => t('Configure how many time and at what intervals to attempt rebilling on a failed recurring payment.'),
+  );
+  $extensions = uc_recurring_get_extension_list();
+  $extend_days = array();
+  foreach ($extensions as $ext) {
+    $days = $ext->time_to_extend / (24*60*60);
+    $rows[] = array(
+      'attempt' => $ext->rebill_attempt + 1,
+      'time_to_extent' => $ext->time_to_extend == 0 ? t('expire') : t('@num_days days', array('@num_days' => $days)),
+    );
+    if ($ext->time_to_extend == 0) break;
+    $extend_days[] = $days;
+  }
+  $form['extensions']['default'] = array(
+    '#value' => theme('table', array(t('Attempt #'), t('On a failed payment re-attempt renew after')), $rows, array('style' => "width: auto;"))
+  );
+  $form['extensions']['edit_extensions'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Reattempt on Failure'),
+    '#description' => t('Enter comma (,) seperated list of days to reattempt failed recurring charges, for example: 3,5 would mean that if the renewal failed it would first be extended by 3 days and re-attempted again, if that failed it would be extended for another 5 days, if the final attempt failed it would expire.<br/><br/>Note: that this feature only works when renewals are processed through a gateway that Ubercart Recurring Fees actually triggers. That usually means if you are using a hosted gateway (e.g. Paypal Subscriptions) these settings will not be used, instead the default renewal settings of that gateway will be used.'),
+    '#default_value' => implode(',', $extend_days),
+  );
+
+  $form['#submit'][] = 'uc_recurring_payment_form_save_extensions';
+
+  return system_settings_form($form);
+}
+
+/**
+ * Saves the extension options.
+ */
+function uc_recurring_payment_form_save_extensions($form, &$form_state) {
+  if ($form_state['values']['submit'] == t('Save configuration')) {
+    uc_recurring_save_extensions($form_state['values']['edit_extensions']);
+  }
+}
