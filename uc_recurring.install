@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.install,v 1.1.4.11 2010/04/20 05:33:35 univate Exp $
+// $Id: uc_recurring.install,v 1.1.4.12 2010/04/22 02:55:48 univate Exp $
 
 /**
  * @file
@@ -502,7 +502,8 @@ function uc_recurring_update_6008() {
  */
 function uc_recurring_update_6009() {
   $ret = array();
-  db_change_field($ret, 'uc_recurring_users', 'order_product_id', 'order_product_id', array('type' => 'int', 'size' => 'small', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => 0));
+  // remove this update as we incorrectly changed the field size which could break your site if applied.
+  //db_change_field($ret, 'uc_recurring_users', 'order_product_id', 'order_product_id', array('type' => 'int', 'size' => 'small', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => 0));
   return $ret;
 }
 
