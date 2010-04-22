@@ -156,6 +156,13 @@ function uc_recurring_upgrade_load($pfid) {
 }
 
 /**
+ * Implementation of hook_order().
+ */
+function uc_recurring_upgrade_order($op, &$arg1, $arg2) {
+  
+}
+
+/**
  *
  */
 function uc_recurring_upgrade_calculations() {
