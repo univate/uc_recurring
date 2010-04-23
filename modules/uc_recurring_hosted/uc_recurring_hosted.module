@@ -486,7 +486,7 @@ function uc_recurring_hosted_form_uc_paypal_wps_form_alter(&$form, $form_state) 
   $order = $form['#parameters'][2];
 
   // if recurring fees exist in the order
-  $recurring_fees = uc_recurring_get_recurring_products_in_order($order);
+  $recurring_fees = uc_recurring_product_get_recurring_products_in_order($order);
 
   if (count($recurring_fees) > 0) {
     // TODO: what do we do if someone tries to order more then one subscription??

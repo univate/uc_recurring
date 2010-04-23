@@ -159,7 +159,7 @@ class ucRecurringAPITestCase extends ucRecurringTestCase {
   }
 
   function setUp() {
-    parent::setUp('uc_recurring');
+    parent::setUp('uc_recurring', 'uc_recurring_product');
 
     $this->createRecurringUsers();
   }
@@ -286,7 +286,7 @@ class ucRecurringIntegrationTestCase extends ucRecurringTestCase {
   }
 
   function setUp() {
-    parent::setUp('uc_order', 'uc_recurring', 'uc_payment', 'uc_recurring_mock_gateway');
+    parent::setUp('uc_order', 'uc_recurring', 'uc_recurring_product', 'uc_payment', 'uc_recurring_mock_gateway');
 
     $this->createRecurringUsers();
   }
@@ -307,7 +307,7 @@ class ucRecurringIntegrationTestCase extends ucRecurringTestCase {
       'uc_recurring_payment_methods[mock_gateway]' => TRUE,
       'uc_recurring_checkout_message' => $checkoutMessage,
     );
-    $this->drupalPost('admin/store/settings/products/edit/features', $settings, t('Save configuration'));
+    $this->drupalPost('admin/store/settings/payment/edit/recurring', $settings, t('Save configuration'));
 
     // create products with recurring features
     $product = $this->createProduct();
@@ -351,7 +351,7 @@ class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
   }
 
   function setUp() {
-    parent::setUp('uc_order', 'uc_recurring', 'uc_payment', 'uc_paypal', 'uc_recurring_hosted');
+    parent::setUp('uc_order', 'uc_recurring', 'uc_recurring_product', 'uc_payment', 'uc_paypal', 'uc_recurring_hosted');
 
     $this->createRecurringUsers();
   }
@@ -367,7 +367,7 @@ class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
 
     // Select mock gateway for payments.
     $settings = array('uc_recurring_payment_methods[paypal_wps]' => TRUE);
-    $this->drupalPost('admin/store/settings/products/edit/features', $settings, t('Save configuration'));
+    $this->drupalPost('admin/store/settings/payment/edit/recurring', $settings, t('Save configuration'));
 
     // Create products with recurring features.
     $product = $this->createProduct(array('sell_price' => 20.00));

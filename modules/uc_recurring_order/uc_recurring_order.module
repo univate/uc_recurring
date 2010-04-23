@@ -202,10 +202,12 @@ function uc_recurring_order_pane_checkout($op, &$arg1, $arg2) {
 
     case 'process':
       // Can't renew orders that include product with recurring payments.
-      if (($products = uc_recurring_get_recurring_products_in_order($order))) {
-        unset($_SESSION['uc_recurring_order']);
-        drupal_set_message(t('Unable to create recurring order when it contains recurring products'), 'warning');
-        return FALSE;
+      if (module_exits('uc_recurring_product')) {
+        if (($products = uc_recurring_product_get_recurring_products_in_order($order))) {
+          unset($_SESSION['uc_recurring_order']);
+          drupal_set_message(t('Unable to create recurring order when it contains recurring products'), 'warning');
+          return FALSE;
+        }
       }
 
       if ($arg2['recurring_option']) {
