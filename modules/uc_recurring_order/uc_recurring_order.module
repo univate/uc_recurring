@@ -282,6 +282,7 @@ function uc_recurring_order_process_order($order, $recurring) {
 
     $fee->created = time();
     $fee->order_id = $order->order_id;
+    $fee->module = 'uc_recurring_order';
 
     // If the product fee amount is 0, it means we need to use the product
     // price. This allows recurring fees to be adjusted by attributes.
@@ -329,6 +330,10 @@ function uc_recurring_order_process_order($order, $recurring) {
  * Implements hook_recurring_renewal_pending()
  */
 function uc_recurring_order_recurring_renewal_pending(&$order, $fee) {
+  if ($fee->module != 'uc_recurring_order') {
+     return;
+  }
+
   // recreate order
   if (!empty($fee->data['uc_recurring_order'])) {
     $order->products = $fee->data['uc_recurring_order']['products'];

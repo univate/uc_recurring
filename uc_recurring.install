@@ -12,63 +12,6 @@
 function uc_recurring_schema() {
   $schema = array();
 
-  $schema['uc_recurring_products'] = array(
-    'description' => t('Data for recurring fees attached to products.'),
-    'fields' => array(
-      'pfid' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'model' => array(
-        'description' => t('The SKU the recurring fee applies to.'),
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '0',
-      ),
-      'fee_amount' => array(
-        'description' => t('The amount of the recurring fee.'),
-        'type' => 'numeric',
-        'precision' => 15,
-        'scale' => 3,
-        'not null' => TRUE,
-        'default' => 0.0,
-      ),
-      'initial_charge' => array(
-        'description' => t('The amount of time between checkout and the first charge.'),
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '0',
-      ),
-      'regular_interval' => array(
-        'description' => t('The amount of time between charges.'),
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '0',
-      ),
-      'number_intervals' => array(
-        'description' => t('The number of times the fee should be charged.'),
-        'type' => 'int',
-        'size' => 'small',
-        'unsigned' => FALSE,
-        'not null' => TRUE,
-        'default' => -1,
-      ),
-      'nid' => array(
-        'description' => t('The ID of the node this role feature is attached to.'),
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-    ),
-    'primary key' => array('pfid'),
-  );
-
   $schema['uc_recurring_users'] = array(
     'description' => t('Data for recurring fees attached to users/orders scheduled to be charged.'),
     'fields' => array(
@@ -187,6 +130,12 @@ function uc_recurring_schema() {
         'type' => 'int',
         'not null' => TRUE,
         'default' => 0,
+      ),
+      'module' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '0',
       ),
     ),
     'primary key' => array('rfid'),
@@ -460,9 +409,9 @@ function uc_recurring_update_6006() {
 
   // make sure that the default value is already correct
   $sql = "UPDATE {uc_recurring_users} SET remaining_intervals = -1 WHERE remaining_intervals IS NULL";
-  db_query($sql);
+  $ret[] = update_sql($sql);
   $sql = "UPDATE {uc_recurring_products} SET number_intervals = -1 WHERE number_intervals IS NULL";
-  db_query($sql);
+  $ret[] = update_sql($sql);
 
   db_change_field($ret, 'uc_recurring_users', 'remaining_intervals', 'remaining_intervals', array('description' => t('The remaining number of times the fee should be charged.')) + $intervals);
   db_change_field($ret, 'uc_recurring_products', 'number_intervals', 'number_intervals', array('description' => t('The number of times the fee should be charged.')) + $intervals);
@@ -492,20 +441,24 @@ function uc_recurring_update_6007() {
 function uc_recurring_update_6008() {
   $ret = array();
   
-  db_query("UPDATE {uc_recurring_extensions} set rebill_attempt=rebill_attempt-1");
+  $ret[] = update_sql("UPDATE {uc_recurring_extensions} set rebill_attempt=rebill_attempt-1");
   
   return $ret;
 }
 
 /**
+ * ** Removed this update as we incorrectly changed the field size which could
+ * break your site if applied. **
+ *
  * Allow product ID to be NULL if this recurring fee is not for a specific product.
  */
+/*
 function uc_recurring_update_6009() {
   $ret = array();
-  // remove this update as we incorrectly changed the field size which could break your site if applied.
   //db_change_field($ret, 'uc_recurring_users', 'order_product_id', 'order_product_id', array('type' => 'int', 'size' => 'small', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => 0));
   return $ret;
 }
+*/
 
 /**
  * Mistake in last update to set size of order_product_field.
@@ -513,5 +466,21 @@ function uc_recurring_update_6009() {
 function uc_recurring_update_6010() {
   $ret = array();
   db_change_field($ret, 'uc_recurring_users', 'order_product_id', 'order_product_id', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'default' => 0));
+  return $ret;
+}
+
+/**
+ * Move product recurring feature to its own module.
+ * Add field to indicate which module handles the recurring fee.
+ */
+function uc_recurring_update_6011() {
+  $ret = array();
+  drupal_install_modules(array('uc_recurring_product'));
+  $ret[] = update_sql("INSERT {uc_recurring_product} SELECT * FROM {uc_recurring_products}");
+  db_drop_table($ret, 'uc_recurring_products');
+
+  db_add_field($ret, 'uc_recurring_users', 'module', array('type' => 'varchar', 'length' => '255', 'not null' => TRUE, 'default' => ''));
+  $ret[] = update_sql("UPDATE {uc_recurring_users} SET module = 'uc_recurring_order' WHERE data LIKE '%uc_recurring_order%'");
+  $ret[] = update_sql("UPDATE {uc_recurring_users} SET module = 'uc_recurring_product' WHERE module = ''");
   return $ret;
 }
