@@ -33,7 +33,7 @@ Step 3: Setup Recurring Payments:
 have the uc_payment module enabled)
   * Requirement: Installed and setup payment gateways in ubercart.
   * Go to:
-    "Store administration" -> "Configuration" -> "Products Settings" -> "Edit" -> "Product Features"
+    "Store administration" -> "Configuration" -> "Payment Settings" -> "Edit" -> "Recurring payments"
   * Select payment methods that should be allows to process recurring payments,
     only the methods selected will be shown on the checkout page when a order
     includes a recurring product.
