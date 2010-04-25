@@ -411,7 +411,8 @@ class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
     // Handle failed payment.
     $post = $this->paypal_message('subscr_failed', $order_id, 50);
     $response = drupal_http_request($url, $headers, 'POST', http_build_query($post, '', '&'));
-    $order = uc_order_load($new_order_id);
+    $new_order_id = $this->lastCreatedOrderId();
+    $this->assertEqual($order_id+1, $new_order_id, t('No new order for failed payment'));
 
     // Handle cancellation.
     $post = $this->paypal_message('subscr_cancel', $order_id, 50);
