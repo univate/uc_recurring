@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_order.module,v 1.1.2.1 2010/03/31 04:26:10 univate Exp $
+// $Id: uc_recurring_order.module,v 1.1.2.2 2010/04/28 02:00:19 univate Exp $
 
 /**
  * @file
@@ -158,7 +158,7 @@ function uc_recurring_order_checkout_pane() {
   $panes[] = array(
     'id' => 'recurring',
     'callback' => 'uc_recurring_order_pane_checkout',
-    'title' => t('Recurring order'),
+    'title' => t(variable_get('uc_recurring_order_pane_title', 'Recurring Order')),
     'desc' => t("Allows shoppers to select to have their order automatically re-occur."),
     'weight' => 5,
     'process' => TRUE,
@@ -191,7 +191,7 @@ function uc_recurring_order_pane_checkout($op, &$arg1, $arg2) {
         $recurring = $arg1->data['recurring_option'];
       }
 
-      $description = t('Select to have this order automatically.');
+      $description = t(variable_get('uc_recurring_pane_description', 'Would you like to have this order automatically shipped to your home or office?'));
       $contents['recurring_option'] = array(
         '#type' => 'select',
         '#title' => t(variable_get('uc_recurring_order_pane_title', 'Recurring Order')),
@@ -210,7 +210,7 @@ function uc_recurring_order_pane_checkout($op, &$arg1, $arg2) {
         }
       }
 
-      if ($arg2['recurring_option']) {
+      if ($arg2['recurring_option'] !== '0 months') {
         $recurring_options = _uc_recurring_order_recurring_options();
         $recurring = check_plain($arg2['recurring_option']);
         $next_renewal = strtotime('+'. $recurring);
