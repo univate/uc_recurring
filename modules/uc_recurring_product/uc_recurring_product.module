@@ -239,6 +239,8 @@ function uc_recurring_product_order_view_update_form_submit($form, &$form_state)
 
 /**
  * Implementation of hook_form_FORM-ID_alter().
+ *
+ * @see uc_cart_checkout_form()
  */
 function uc_recurring_product_form_uc_cart_checkout_form_alter(&$form, $form_state) {
   // We may need to alter the checkout form to remove invalid payment methods.
@@ -282,6 +284,8 @@ function uc_recurring_product_form_uc_cart_checkout_form_alter(&$form, $form_sta
 
 /**
  * Implementation of hook_form_FORM-ID_alter().
+ *
+ * @see uc_order_view_update_form()
  */
 function uc_recurring_form_uc_order_view_update_form_alter(&$form, $form_state) {
   // Load the order object based on the form value for the order ID.
