@@ -204,7 +204,9 @@ function uc_recurring_subscription_action_grant_role($order, $settings) {
   else {
     foreach ($order->products as $pid => $product) {
       $subscription = uc_recurring_subscription_load($product->nid);
-      $account->roles += $subscription->access[$settings['role_option']];
+      if (!empty($subscription->access[$settings['role_option']])) {
+        $account->roles += $subscription->access[$settings['role_option']];
+      }
     }
   }
   user_save($account, array('roles' => $account->roles));
@@ -263,10 +265,12 @@ function uc_recurring_subscription_action_revoke_role($order, $settings) {
   else {
     foreach ($order->products as $pid => $product) {
       $subscription = uc_recurring_subscription_load($product->nid);
-      foreach ($subscription->roles[$settings['role_option']] as $rid => $role) {
-        // @todo: we need to check other subscriptions to ensure that the role
-        // is no longer required by another subscription.
-        unset($account->roles[$rid]);
+      if (!empty($subscription->roles[$settings['role_option']])) {
+        foreach ($subscription->roles[$settings['role_option']] as $rid => $role) {
+          // @todo: we need to check other subscriptions to ensure that the role
+          // is no longer required by another subscription.
+          unset($account->roles[$rid]);
+        }
       }
     }
   }

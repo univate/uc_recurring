@@ -224,7 +224,7 @@ function _uc_recurring_subscription_create_attribute_option($value, $interval) {
       'days' => t('Daily'),
       'weeks' => t('Weekly'),
       'months' => t('Monthly'),
-      'year' => t('Yearly')
+      'years' => t('Yearly')
     );
     return $intervals[$interval];
   }
