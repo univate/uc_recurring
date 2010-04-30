@@ -693,6 +693,7 @@ function uc_recurring_subscription_subscriber_list($form_state, $product_id = -1
   if (is_numeric(arg(4))) {
     $product = node_load(arg(4));
     $header = array(
+      array('data' => t('Order')),
       array('data' => t('User'), 'field' => 'u.name'),
       array('data' => t('Subscription Started'), 'field' => 'ru.created'),
       array('data' => t('Next Renewal'), 'field' => 'ru.next_charge'),
@@ -712,6 +713,7 @@ function uc_recurring_subscription_subscriber_list($form_state, $product_id = -1
 
     while ($account = db_fetch_object($result)) {
       $user_rows[] = array(
+        'order' => l($account->order_id, 'admin/store/orders/'. $account->order_id),
         'user' => l($account->name, 'user/'. $account->uid),
         'start' => format_date($account->created, 'small'),
         'next' => format_date($account->next_charge, 'small'),
