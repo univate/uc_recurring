@@ -661,7 +661,7 @@ function uc_recurring_subscription_subscriber_list($form_state, $product_id = -1
 
   $result = db_query("SELECT count(u.uid) AS num_users, n.title, n.nid
                       FROM {uc_recurring_users} u
-                        LEFT JOIN {uc_recurring_products} p ON p.pfid = u.pfid
+                        LEFT JOIN {uc_order_products} p ON p.order_product_id = u.order_product_id
                         LEFT JOIN {uc_recurring_subscription} s ON s.nid = p.nid
                         LEFT JOIN {node} n ON n.nid = p.nid
                       WHERE u.remaining_intervals <> 0
@@ -687,39 +687,43 @@ function uc_recurring_subscription_subscriber_list($form_state, $product_id = -1
     );
   }
   $form['list'] = array(
-    '#value' => theme('table', $header, $rows),
+    '#value' => theme('table', $header, $rows) . '<br />',
   );
 
   if (is_numeric(arg(4))) {
+    $product = node_load(arg(4));
     $header = array(
       array('data' => t('User'), 'field' => 'u.name'),
       array('data' => t('Subscription Started'), 'field' => 'ru.created'),
       array('data' => t('Next Renewal'), 'field' => 'ru.next_charge'),
-      array('data' => t('Price'))
+      array('data' => t('Price')),
+      array('data' => t('Operations'))
     );
-    $sql = "SELECT u.*, ru.*
+    $sql = "SELECT u.uid, u.name, ru.*, p.nid, p.title as product_title
             FROM {users} u
               LEFT JOIN {uc_recurring_users} ru ON ru.uid = u.uid
-              LEFT JOIN {uc_recurring_products} p ON p.pfid = ru.pfid
+              LEFT JOIN {uc_order_products} p ON p.order_product_id = ru.order_product_id
               LEFT JOIN {uc_recurring_subscription} s ON s.nid = p.nid
               LEFT JOIN {node} n ON n.nid = p.nid
             WHERE ru.remaining_intervals <> 0 AND n.nid = %d";
 
     $sql .= tablesort_sql($header);
-    $result = pager_query($sql, 20, 0, NULL, arg(4));
+    $result = pager_query($sql, 20, 0, NULL, $product->nid);
 
     while ($account = db_fetch_object($result)) {
       $user_rows[] = array(
-        'user' => $account->name,
-        'start' => format_date($account->created),
-        'next' => format_date($account->next_charge),
+        'user' => l($account->name, 'user/'. $account->uid),
+        'start' => format_date($account->created, 'small'),
+        'next' => format_date($account->next_charge, 'small'),
         'price' => uc_price($account->fee_amount, array()),
         //'status' => uc_recurring_state($account->status),
+        'ops' => implode(' | ', uc_recurring_get_fee_ops('user', $account))
       );
     }
 
     $form['users'] = array(
-      '#value' => theme('table', $header, $user_rows) . theme('pager', NULL, 20, 0),
+      '#value' => '<h2>'. t('Subscribers to <a href="@product_url">@product</a>', array('@product_url' => url('node/'. $product->nid), '@product' => $product->title)) .'</h2>'. 
+        theme('table', $header, $user_rows) . theme('pager', NULL, 20, 0),
     );
   }
 
