@@ -143,6 +143,16 @@ function uc_recurring_access_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
 }
 
 /**
+ * Implementation of hook_views_api().
+ */
+function uc_recurring_access_views_api() {
+  return array(
+    'api' => '2.0',
+    'path' => drupal_get_path('module', 'uc_recurring_access') .'/views',
+  );
+}
+
+/**
  * Form to add/remove recurring access rules for each node.
  */
 function uc_recurring_access_node_form($form_state, $node) {
@@ -408,7 +418,7 @@ function uc_recurring_access_node_has_rules($node) {
  * Load the access rules.
  */
 function _uc_recurring_access_rules() {
-  $access_types = array('node' => t('Recurring Product'), 'role' => t('Role'));
+  $access_types = array('node' => t('Subscription Product'), 'role' => t('Role'));
   drupal_alter('recurring_acess_types', $access_types);
   return $access_types;
 }
