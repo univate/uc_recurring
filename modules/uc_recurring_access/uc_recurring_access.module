@@ -35,7 +35,7 @@ function uc_recurring_access_menu() {
     'access callback' => 'uc_recurring_access_content_type',
     'access arguments' => array(1),
   );
-  
+
   $items['uc_recurring_access/product/autocomplete'] = array(
     'type' => MENU_CALLBACK,
     'page callback' => 'uc_recurring_access_product_autocomplete',
@@ -49,7 +49,7 @@ function uc_recurring_access_menu() {
     'access arguments' => array('administer recurring content'),
     'file' => 'uc_recurring_access.inc',
   );
-  
+
   return $items;
 }
 
@@ -65,7 +65,7 @@ function uc_recurring_access_content_type($node) {
 }
 
 /**
- * Admin settings. 
+ * Admin settings.
  */
 function uc_recurring_access_admin_settings() {
   $types = node_get_types('types');
@@ -76,7 +76,7 @@ function uc_recurring_access_admin_settings() {
     '#type' => 'checkboxes',
     '#title' => t('Select which content types to apply recurring access permissions on.'),
     '#options' => $options,
-    '#default_value' => variable_get('uc_recurring_access_content_types', array()), 
+    '#default_value' => variable_get('uc_recurring_access_content_types', array()),
   );
   $form = system_settings_form($form);
   return $form;
@@ -194,7 +194,7 @@ function uc_recurring_access_node_form($form_state, $node) {
     '#description' => t('Enter a PHP time, e.g. 1 week'),
     '#size' => 20,
   );
-  // Get commission structure for this product
+
   $count = 0;
   $rules = uc_recurring_access_node_load($node->nid);
   foreach ($rules as $rule) {
@@ -245,7 +245,7 @@ function uc_recurring_access_node_form($form_state, $node) {
 }
 
 /**
- *
+ * Save new access rules and delete old ones.
  */
 function uc_recurring_access_node_form_submit($form, &$form_state) {
   $nid = $form_state['values']['nid'];
@@ -305,26 +305,7 @@ function uc_recurring_access_recurring_renewal_completed(&$order, &$fee) {
   $access->time_applied += $fee->next_charge - time();
   uc_recurring_access_user_save($access);
 
-  // There is probably a better way of handling role renewals???
-  // We probably should be doing this in the uc_recurring_subscription module via a hook.
-  if (module_exists('uc_recurring_subscription')) {
-    $subscription = uc_recurring_subscription_load($product->nid);
-    // role rules
-    foreach ($subscription->access['subscribe_grant'] as $rid) {
-      $access = uc_recurring_access_user_load($fee->uid, 'role', $rid);
-      if (empty($access)) {
-        $access = new stdClass();
-        $access->uid = $fee->uid;
-        $access->created = time();
-        $access->access_type = 'role';
-        $access->id = $rid;
-        $access->new = TRUE;
-        $access->time_applied = 0;
-      }
-      $access->time_applied += $fee->next_charge - time();
-      uc_recurring_access_user_save($access);
-    }
-  }
+  module_invoke('uc_recurring_access_apply', $fee, $product);
 }
 
 /**
@@ -382,7 +363,7 @@ function uc_recurring_access_node_save($access) {
 
 /**
  * Load node access rule.
- * 
+ *
  * @param $nid
  *   Node ID.
  */
@@ -399,7 +380,7 @@ function uc_recurring_access_node_load($nid) {
  * Delete node access rule.
  */
 function uc_recurring_access_node_delete($nid, $access_type, $id) {
-  db_query("DELETE FROM {uc_recurring_access_content} 
+  db_query("DELETE FROM {uc_recurring_access_content}
             WHERE nid = %d AND access_type = '%s' AND id = %d",
             $nid, $access_type, $id);
 
@@ -418,8 +399,8 @@ function uc_recurring_access_node_has_rules($node) {
  * Load the access rules.
  */
 function _uc_recurring_access_rules() {
-  $access_types = array('node' => t('Subscription Product'), 'role' => t('Role'));
-  drupal_alter('recurring_acess_types', $access_types);
+  $access_types = array('node' => t('Subscription Product'));
+  drupal_alter('uc_recurring_access_types', $access_types);
   return $access_types;
 }
 
@@ -459,7 +440,7 @@ function theme_uc_recurring_time($time) {
       $unit = intval($time / $t);
       if ($unit <= 0) continue;
       $time = $time % $t;
-      $str .= $unit .' '. $suffix .' '; 
+      $str .= $unit .' '. $suffix .' ';
     }
   }
   return $str;

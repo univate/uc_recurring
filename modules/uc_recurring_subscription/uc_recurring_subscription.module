@@ -275,3 +275,39 @@ function uc_recurring_subscription_form_alter(&$form, $form_state, $form_id) {
 
   }
 }
+
+
+/*******************************************************************************
+ * UC Recurring Access Hooks - allow access by restricted by the time purchasedi
+ * of each role in this module.
+ ******************************************************************************/
+
+/**
+ * All recurring access by roles setup by this module.
+ */
+function uc_recurring_subscription_uc_recurring_access_types_alter(&$access) {
+  $access['role'] = t('Role');
+}
+
+/**
+ * Add access definitions for roles.
+ */
+function uc_recurring_subscription_uc_recurring_access_apply($fee, $product) {
+  $subscription = uc_recurring_subscription_load($product->nid);
+  // role rules
+  foreach ($subscription->access['subscribe_grant'] as $rid) {
+    $access = uc_recurring_access_user_load($fee->uid, 'role', $rid);
+    if (empty($access)) {
+      $access = new stdClass();
+      $access->uid = $fee->uid;
+      $access->created = time();
+      $access->access_type = 'role';
+      $access->id = $rid;
+      $access->new = TRUE;
+      $access->time_applied = 0;
+    }
+    $access->time_applied += $fee->next_charge - time();
+    uc_recurring_access_user_save($access);
+  }
+}
+

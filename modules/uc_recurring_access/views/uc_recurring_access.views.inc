@@ -110,6 +110,18 @@ function uc_recurring_access_views_data() {
         'label' => t('Has access to content'),
       ),
     ),
+    'access_in' => array(
+      'title' => t('Has access in'),
+      'help' => t('Checkout how many seconds till user has access, e.g. find the content that will be available in a months time'),
+      'real field' => 'time_applied',
+      'field' => array(
+        'handler' => 'uc_recurring_access_handler_field_time_in',
+      ),
+      'filter' => array(
+        'handler' => 'uc_recurring_access_handler_filter_has_access_in',
+        'label' => t('Has access to content in'),
+      ),
+    ),
   );
 
   $data['uc_recurring_access_user']['access_rid'] = array(
@@ -120,7 +132,7 @@ function uc_recurring_access_views_data() {
       'handler' => 'views_handler_filter_user_roles',
     ),
     'argument' => array(
-      'handler' => 'views_handler_argument_users_roles_rid',
+      'handler' => 'uc_recurring_access_handler_argument_users_roles_rid',
       'numeric' => TRUE,
     ),
   );
@@ -151,9 +163,13 @@ function uc_recurring_access_views_handlers() {
     'handlers' => array(
       // fields
       'uc_recurring_access_handler_field_time' => array( 'parent' => 'views_handler_field',),
-      //fiters
+      'uc_recurring_access_handler_field_time_in' => array( 'parent' => 'views_handler_field',),
+      // fiters
       'uc_recurring_access_handler_filter_access_type' => array('parent' => 'views_handler_filter_in_operator',),
       'uc_recurring_access_handler_filter_has_access' => array('parent' => 'views_handler_filter_boolean_operator',),
+      'uc_recurring_access_handler_filter_has_access_in' => array('parent' => 'views_handler_filter_numeric',),
+      // arguments
+      'uc_recurring_access_handler_argument_users_roles_rid' => array('parent' => 'views_handler_argument_users_roles_rid',),
     ),
   );
 }

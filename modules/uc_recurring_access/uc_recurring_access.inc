@@ -23,6 +23,9 @@ function uc_recurring_access_ahah($context) {
  */
 function _uc_recurring_access_ahah_access_type($form_state) {
   switch ($form_state['values']['recurring_access']['new']['access_type']) {
+    case '':
+      $form['match'] = array('#value' => '');
+      break;
     case 'node':
       $form['match'] = array(
         '#type' => 'textfield',
@@ -38,11 +41,14 @@ function _uc_recurring_access_ahah_access_type($form_state) {
       );
       break;
     default:
-       $form['match'] = array('#value' => '');
+       $form['match'] = array(
+        '#type' => 'textfield',
+        '#size' => 20,
+       );
   }
 
   $output = _uc_recurring_access_ahah_render($form, 'match');
-  print drupal_to_js(array('data' => $output, 'status' => true));
+  drupal_json(array('data' => $output, 'status' => true));
 }
 
 /*
