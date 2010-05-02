@@ -1,0 +1,80 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Installs the Recurring Access module.
+ */
+
+/**
+ * Implementation hook_schema().
+ */
+function uc_recurring_upgrade_schema() {
+  $schema = array();
+
+  $schema['uc_recurring_product_upgrade'] = array(
+    'description' => t('Product upgrde options.'),
+    'fields' => array(
+      'pfid' => array(
+        'description' => t('The product feature id.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'from_pid' => array(
+        'description' => t('Product upgrading from.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'from_model' => array(
+        'description' => t('The model/sku upgrading from.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'to_pfid' => array(
+        'description' => t('The pfid of the recurring fee upgraded to.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'data' => array(
+        'description' => t('Serialized data to upgrade options.'),
+        'type' => 'text',
+        'serialize' => TRUE,
+      ),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation hook_install().
+ */
+function uc_recurring_upgrade_install() {
+  drupal_install_schema('uc_recurring_upgrade');
+}
+
+/**
+ * Implementation hook_uninstall().
+ */
+function uc_recurring_upgrade_uninstall() {
+  drupal_uninstall_schema('uc_recurring_upgrade');
+
+  db_query("DELETE FROM {variable} WHERE name LIKE 'uc_recurring_upgrade_%%'");
+  cache_clear_all('variables', 'cache');
+}
+
+/**
+ *
+ */
+/*
+function uc_recurring_upgrade_update_6000() {
+}
+*/

@@ -1,0 +1,5 @@
+name = Recurring Upgrades
+description = Allow users to upgrade between products.
+dependencies[] = uc_recurring
+package = Ubercart - recurring
+core = 6.x

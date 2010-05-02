@@ -1,0 +1,447 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Provides a way to upgrade a recurring product.
+ *
+ * Initial module development sponsored by Marketing Results
+ * http://www.marketing-results.com.au/
+ */
+
+/**
+ * Implementation hook_perm()
+ */
+function uc_recurring_access_perm() {
+  return array('administer recurring content');
+}
+
+/**
+ * Implementation hook_menu()
+ */
+function uc_recurring_access_menu() {
+  $items['admin/user/recurring_access'] = array(
+    'type' => MENU_NORMAL_ITEM,
+    'title' => 'Recurring Access',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('uc_recurring_access_admin_settings'),
+    'access arguments' => array('administer recurring content'),
+  );
+  $items['node/%node/recurring_access'] = array(
+    'type' => MENU_LOCAL_TASK,
+    'title' => t('Recurring Access'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('uc_recurring_access_node_form', 1),
+    'access callback' => 'uc_recurring_access_content_type',
+    'access arguments' => array(1),
+  );
+
+  $items['uc_recurring_access/product/autocomplete'] = array(
+    'type' => MENU_CALLBACK,
+    'page callback' => 'uc_recurring_access_product_autocomplete',
+    'access arguments' => array('administer recurring content'),
+    'file' => 'uc_recurring_access.inc',
+  );
+  $items['uc_recurring_access/ahah/%'] = array(
+    'type' => MENU_CALLBACK,
+    'page callback' => 'uc_recurring_access_ahah',
+    'page arguments' => array(2),
+    'access arguments' => array('administer recurring content'),
+    'file' => 'uc_recurring_access.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Check user has access to edit recurring access settings for this node.
+ */
+function uc_recurring_access_content_type($node) {
+  $types = variable_get('uc_recurring_access_content_types',array());
+  if (!empty($types[$node->type])) {
+    return user_access('administer recurring content');
+  }
+  return FALSE;
+}
+
+/**
+ * Admin settings.
+ */
+function uc_recurring_access_admin_settings() {
+  $types = node_get_types('types');
+  foreach ($types as $type => $node_type) {
+    $options[$type] = $node_type->name;
+  }
+  $form['uc_recurring_access_content_types'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Select which content types to apply recurring access permissions on.'),
+    '#options' => $options,
+    '#default_value' => variable_get('uc_recurring_access_content_types', array()),
+  );
+  $form = system_settings_form($form);
+  return $form;
+}
+
+/**
+ * Implementation hook_theme()
+ */
+function uc_recurring_access_theme() {
+  return array(
+    'uc_recurring_access_items_items' => array(
+      'arguments' => array('form' => NULL),
+    ),
+    'uc_recurring_time' => array(
+      'arguments' => array('time' => NULL),
+    ),
+  );
+}
+
+/**
+ * Implementation hook_nodeapi()
+ */
+function uc_recurring_access_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  global $user;
+
+  // Do not limit access to admin users.
+  if ($user->uid == 1 || user_access('administer recurring content')) {
+    return;
+  }
+
+  $types = variable_get('uc_recurring_access_content_types',array());
+  if (empty($types[$node->type])) {
+    return;
+  }
+
+  // We only block access for the full node, teasers are still accessable.
+  if ($op == 'view' && uc_recurring_access_node_has_rules($node)) {
+    $teaser = $a3;
+    $result = db_query("SELECT c.nid, c.access_type, c.id, u.time_applied, c.time_required
+                        FROM {uc_recurring_access_content} c
+                          LEFT JOIN {uc_recurring_access_user} u ON u.id=c.id AND c.access_type=u.access_type
+                        WHERE c.nid = %d AND (u.uid = %d OR (c.access_type='role' && c.id = %d))
+                        ORDER BY CAST(c.time_required - u.time_applied AS signed)",
+                        $node->nid, $user->uid, DRUPAL_AUTHENTICATED_RID);
+
+    $access = FALSE;
+    while ($rule = db_fetch_object($result)) {
+      $node->time_required = $rule->time_required;
+      $node->time_applied = $rule->time_applied;
+      if ($rule->access_type == 'role' && $rule->id == DRUPAL_AUTHENTICATED_RID) {
+        $rule->time_applied = time() - $user->created;
+      }
+      if (($rule->time_applied - $rule->time_required) > 0) {
+        $access = TRUE;
+        break;
+      }
+    }
+    $node->recurring_access = $access;
+    if ($teaser == FALSE && $access == FALSE) {
+      drupal_access_denied();
+      exit;
+    }
+  }
+}
+
+/**
+ * Implementation of hook_views_api().
+ */
+function uc_recurring_access_views_api() {
+  return array(
+    'api' => '2.0',
+    'path' => drupal_get_path('module', 'uc_recurring_access') .'/views',
+  );
+}
+
+/**
+ * Form to add/remove recurring access rules for each node.
+ */
+function uc_recurring_access_node_form($form_state, $node) {
+  drupal_set_title(t('Recurring access rules for @title', array('@title' => $node->title)));
+  if (!uc_recurring_access_content_type($node)) {
+    $form['recurring_acess'] = array(
+      '#value' => t('Recurring access not applicable to this content type.'),
+    );
+    return $form;
+  }
+  drupal_add_js('misc/autocomplete.js');
+
+  $form['message'] = array(
+    '#value' => t('<p>This content can be restricted to only allow user accounts which match one of the following recurring product access rules.</p>'),
+  );
+
+  $form['recurring_access']['#theme'] = 'uc_recurring_access_items_items';
+  $form['recurring_access']['#tree'] = TRUE;
+  // add new rule form
+  $rule_types = _uc_recurring_access_rules();
+  $form['recurring_access']['new']['access_type'] = array(
+    '#type' => 'select',
+    '#options' => array('' => 'Add recurring access rule for ...') + $rule_types,
+    '#ahah' => array(
+      'event' => 'change',
+      'path' => 'uc_recurring_access/ahah/access_type',
+      'wrapper' => 'recurring-access-type',
+      'method' => 'replace',
+      'effect' => 'fade',
+      'progress' => array(
+      ),
+    ),
+  );
+  $form['recurring_access']['new']['match'] = array(
+    '#value' => '<div id="recurring-access-type"></div>'
+  );
+  $form['recurring_access']['new']['time_required'] = array(
+    '#type' => 'textfield',
+    '#description' => t('Enter a PHP time, e.g. 1 week'),
+    '#size' => 20,
+  );
+
+  $count = 0;
+  $rules = uc_recurring_access_node_load($node->nid);
+  foreach ($rules as $rule) {
+    $form['recurring_access'][$count]['access_type'] = array(
+      '#value' => $rule_types[$rule->access_type],
+    );
+    $form['recurring_access'][$count]['time_required'] = array(
+      '#value' => theme('uc_recurring_time', $rule->time_required),
+    );
+    switch ($rule->access_type) {
+      case 'node':
+        $product = node_load($rule->id);
+        $value = l($product->title, 'nid/'. $rule->id);
+        break;
+      case 'role':
+        static $roles;
+        if (!isset($roles)) {
+          $roles = user_roles(TRUE);
+        }
+        $value = $roles[$rule->id];
+    }
+    $form['recurring_access'][$count]['match'] = array(
+      '#value' => $value,
+    );
+    $form['recurring_access'][$count]['id'] = array(
+      '#type' => 'hidden',
+      '#value' => $rule->id,
+    );
+    $form['recurring_access'][$count]['access'] = array(
+      '#type' => 'hidden',
+      '#value' => $rule->access_type,
+    );
+    $form['recurring_access'][$count]['delete'] = array(
+      '#type' => 'checkbox',
+    );
+    $count++;
+  }
+  $form['nid'] = array(
+    '#type' => 'value',
+    '#value' => $node->nid,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+  return $form;
+}
+
+/**
+ * Save new access rules and delete old ones.
+ */
+function uc_recurring_access_node_form_submit($form, &$form_state) {
+  $nid = $form_state['values']['nid'];
+
+  // save the new record
+  if ($form_state['values']['recurring_access']['new']['access_type'] != '') {
+    $access = new stdClass();
+    $access->nid = $nid;
+    $access->time_required = strtotime('+'. $form_state['values']['recurring_access']['new']['time_required'], 0);
+    $access->access_type = $form_state['values']['recurring_access']['new']['access_type'];
+    $access->id = $form_state['values']['match'];
+    uc_recurring_access_node_save($access);
+  }
+
+  // delete the ones that have been checked.
+  foreach ($form_state['values']['recurring_access'] as $rule_id => $access) {
+    if ($access['delete'] == 1) {
+      // delete this record
+      $access_type = $form_state['values']['recurring_access'][$rule_id]['access'];
+      $id = $form_state['values']['recurring_access'][$rule_id]['id'];
+      uc_recurring_access_node_delete($nid, $access_type, $id);
+    }
+  }
+}
+
+/**
+ * Create the access on a new recurring fee setup.
+ *
+ * @see uc_recurring_process_order
+ */
+function uc_recurring_access_order($op, &$order, $arg2) {
+  if ($op == 'submit') {
+    $fees = uc_recurring_get_fees($order);
+    foreach ($fees as $fee) {
+      uc_recurring_access_recurring_renewal_completed($order, $fee);
+    }
+  }
+}
+
+/**
+ * Implements hook_recurring_renewal_completed()
+ *
+ * @see uc_recurring_renew()
+ */
+function uc_recurring_access_recurring_renewal_completed(&$order, &$fee) {
+  $product = uc_recurring_fee_product_load($fee->pfid);
+  $access = uc_recurring_access_user_load($fee->uid, 'node', $product->nid);
+  if (empty($access)) {
+    $access = new stdClass();
+    $access->uid = $fee->uid;
+    $access->created = time();
+    $access->access_type = 'node';
+    $access->id = $product->nid;
+    $access->new = TRUE;
+    $access->time_applied = 0;
+  }
+  $access->time_applied += $fee->next_charge - time();
+  uc_recurring_access_user_save($access);
+
+  module_invoke('uc_recurring_access_apply', $fee, $product);
+}
+
+/**
+ * Save a access rule for a user.
+ */
+function uc_recurring_access_user_save($access) {
+  if ($access->new) {
+    drupal_write_record('uc_recurring_access_user', $access);
+  }
+  else {
+    $key = array('uid', 'access_type', 'id');
+    drupal_write_record('uc_recurring_access_user', $access, $key);
+  }
+}
+
+/**
+ * Load user access rules for this user.
+ *
+ * @param $uid
+ *   User ID.
+ * @param $type
+ *   The access_type e.g. node, role.
+ * @param $id
+ *   The id of the access e.g nid, rid
+ * @return
+ *   The recurring access content rule object.
+ */
+function uc_recurring_access_user_load($uid, $type = NULL, $id = NULL) {
+  if (!isset($type)) {
+    $result = db_query('SELECT * FROM {uc_recurring_access_user} WHERE uid = %d', $uid);
+  }
+  else {
+    $result = db_query("SELECT * FROM {uc_recurring_access_user} WHERE uid = %d AND access_type = '%s' AND id = %d", $uid, $type, $id);
+  }
+
+  $access = array();
+  while ($rule = db_fetch_object($result)) {
+    $access[] = $rule;
+  }
+  if (count($access) == 1) {
+    return $access[0];
+  }
+  return $access;
+}
+
+/**
+ * Save node access rule.
+ *
+ * @param $access
+ *   The recurring node access object.
+ */
+function uc_recurring_access_node_save($access) {
+  drupal_write_record('uc_recurring_access_content', $access);
+}
+
+/**
+ * Load node access rule.
+ *
+ * @param $nid
+ *   Node ID.
+ */
+function uc_recurring_access_node_load($nid) {
+  $result = db_query("SELECT * FROM {uc_recurring_access_content} WHERE nid = %d", $nid);
+  $node_access = array();
+  while ($access = db_fetch_object($result)) {
+    $node_access[] = $access;
+  }
+  return $node_access;
+}
+
+/**
+ * Delete node access rule.
+ */
+function uc_recurring_access_node_delete($nid, $access_type, $id) {
+  db_query("DELETE FROM {uc_recurring_access_content}
+            WHERE nid = %d AND access_type = '%s' AND id = %d",
+            $nid, $access_type, $id);
+
+  return SAVED_DELETED;
+}
+
+/**
+ * If a node has no rules then we grant access to everyone.
+ */
+function uc_recurring_access_node_has_rules($node) {
+  $count = db_result(db_query("SELECT count(*) FROM {uc_recurring_access_content} WHERE nid = %d", $node->nid));
+  return ($count > 0);
+}
+
+/**
+ * Load the access rules.
+ */
+function _uc_recurring_access_rules() {
+  $access_types = array('node' => t('Subscription Product'));
+  drupal_alter('uc_recurring_access_types', $access_types);
+  return $access_types;
+}
+
+/**
+ * Theme the node recurring access rules in a table.
+ */
+function theme_uc_recurring_access_items_items($form) {
+  $header = array(t('Access type'), t('ID / Object'), t('Purchased time'), t('Delete'));
+  $rows = array();
+  foreach (element_children($form) as $key) {
+    $row = array();
+    $row[] = drupal_render($form[$key]['access_type']);
+    $row[] = drupal_render($form[$key]['match']);
+    $row[] = drupal_render($form[$key]['time_required']);
+    $row[] = drupal_render($form[$key]['delete']);
+    $rows[] = $row;
+  }
+  $output = theme('table', $header, $rows);
+  $output .= drupal_render($form);
+  return $output;
+}
+
+/**
+ * Takes a time in seconds and converts to something more readable.
+ * e.g. 2 weeks 4 days
+ */
+function theme_uc_recurring_time($time) {
+  $periods = array(
+    'week' => 604800,
+    'day' => 86400,
+    'hour' => 3600,
+    'min' => 60,
+  );
+  $str = '';
+  foreach ($periods as $suffix => $t) {
+    if ($time >= $t) {
+      $unit = intval($time / $t);
+      if ($unit <= 0) continue;
+      $time = $time % $t;
+      $str .= $unit .' '. $suffix .' ';
+    }
+  }
+  return $str;
+}

@@ -1,0 +1,115 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Installs the Recurring Access module.
+ */
+
+/**
+ * Implementation hook_schema().
+ */
+function uc_recurring_access_schema() {
+  $schema = array();
+
+  $schema['uc_recurring_access_user'] = array(
+    'description' => t('Data for users recurring access.'),
+    'fields' => array(
+      'uid' => array(
+        'description' => t('The uid of the user.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'created' => array(
+        'description' => t('The created date of the access.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'time_applied' => array(
+        'description' => t('The number of seconds that has been applied to this access rule.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'access_type' => array(
+        'description' => t('The object used to restrict access e.g node, role.'),
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'id' => array(
+        'description' => t('The ID of the access_type above.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+  );
+  $schema['uc_recurring_access_content'] = array(
+    'description' => t('Data for access to content.'),
+    'fields' => array(
+      'nid' => array(
+        'description' => t('The nid of the content.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'time_required' => array(
+        'description' => t('The number of seconds that a user requires to access to access this node.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'access_type' => array(
+        'description' => t('The object used to restrict access e.g node, role.'),
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'id' => array(
+        'description' => t('The ID of the access_type above.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation hook_install().
+ */
+function uc_recurring_access_install() {
+  drupal_install_schema('uc_recurring_access');
+}
+
+/**
+ * Implementation hook_uninstall().
+ */
+function uc_recurring_access_uninstall() {
+  drupal_uninstall_schema('uc_recurring_access');
+
+  db_query("DELETE FROM {variable} WHERE name LIKE 'uc_recurring_access_%%'");
+  cache_clear_all('variables', 'cache');
+}
+
+/**
+ *
+ */
+/*
+function uc_recurring_access_update_6000() {
+}
+*/
