@@ -563,7 +563,7 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
 
           $new_feature = FALSE;
           if (!empty($value['pfid'])) {
-            $product = uc_recurring_fee_product_load($value['pfid']);
+            $product = uc_recurring_product_fee_load($value['pfid']);
           }
           else {
             $product = new stdClass();

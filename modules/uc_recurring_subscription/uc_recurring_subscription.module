@@ -166,9 +166,9 @@ function uc_recurring_subscription_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) 
 function _uc_recurring_subscription_get_product_features($product_id) {
   $attribute = uc_attribute_load(variable_get('uc_recurring_subscription_attribute', ''), $product_id, 'product');
 
-  $result = db_query("SELECT pfid from {uc_recurring_products} WHERE nid = '%d'", $product_id);
+  $result = db_query("SELECT pfid from {uc_recurring_product} WHERE nid = '%d'", $product_id);
   while ($p = db_fetch_object($result)) {
-    $product = uc_recurring_fee_product_load($p->pfid);
+    $product = uc_recurring_product_fee_load($p->pfid);
 
     $option_name = _uc_recurring_subscription_create_attribute_option($product->regular_interval_value, $product->regular_interval_unit);
     $option = _uc_recurring_subscription_option($option_name);
