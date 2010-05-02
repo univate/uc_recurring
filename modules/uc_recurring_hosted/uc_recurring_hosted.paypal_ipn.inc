@@ -34,7 +34,7 @@ function uc_recurring_hosted_paypal_ipn($order_id) {
       case 'subscr_signup':
         // First we need to create the recurring fee as paypal_wps overrides the
         // submit order function where this normally happens.
-        uc_recurring_process_order($order);
+        uc_recurring_product_process_order($order);
         // Subscriptions do not have a txn_id, so we will use the subscr_id.
         $ipn->txn_id = $ipn->subscr_id;
         break;
