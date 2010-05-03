@@ -593,6 +593,9 @@ function uc_recurring_get_recurring_info($key = '', $reset = FALSE) {
   return $return;
 }
 
+/**
+ * Default a recurring default handler, does nothing except returning TRUE.
+ */
 function uc_recurring_default_handler() {
   return TRUE;
 }
@@ -612,7 +615,7 @@ function uc_recurring_payment_method_supported($payment_method) {
 }
 
 /**
- * Include uc recurring own implementations.
+ * Include uc recurring own payment gateway implementations.
  *
  * @return
  *   The modules that were included.
@@ -622,7 +625,7 @@ function uc_recurring_includes() {
   $modules = array('uc_authorizenet', 'test_gateway', 'uc_credit', 'uc_payment_pack');
   foreach ($modules as $module) {
     if (module_exists($module)) {
-      module_load_include('inc', 'uc_recurring', '/modules/uc_recurring.'. $module);
+      module_load_include('inc', 'uc_recurring', '/includes/uc_recurring.'. $module);
       $return[] = $module;
     }
   }
