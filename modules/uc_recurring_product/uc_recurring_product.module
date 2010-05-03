@@ -3,8 +3,11 @@
 
 /**
  * @file
- * Provides a way to add recurring payments/fees to a product.
+ * Add recurring payments/fees to a product. This is imlpemented through
+ * Ubercarts product features.
  *
+ * Development:
+ *   Chris Hood http://univate.com.au
  */
 
 /**
