@@ -11,6 +11,9 @@
  * be processed on cron runs.
  * Initial charges, even if they're set to occur in 0 days will not be processed
  * immediately upon checkout
+ *
+ * Development
+ *   Chris Hood http://univate.com.au
  */
 
 /**
