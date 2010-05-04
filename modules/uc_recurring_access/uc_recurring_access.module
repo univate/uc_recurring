@@ -159,7 +159,8 @@ function uc_recurring_access_order($op, &$order, $arg2) {
  * @see uc_recurring_renew()
  */
 function uc_recurring_access_recurring_renewal_completed(&$order, &$fee) {
-  $product = uc_recurring_fee_product_load($fee->pfid);
+  global $user;
+  $product = uc_recurring_product_fee_load($fee->pfid);
   $access = uc_recurring_access_user_load($fee->uid, 'node', $product->nid);
   if (empty($access)) {
     $access = new stdClass();
@@ -172,8 +173,9 @@ function uc_recurring_access_recurring_renewal_completed(&$order, &$fee) {
   }
   $access->time_applied += $fee->next_charge - time();
   uc_recurring_access_user_save($access);
+  uc_order_comment_save($fee->order_id, $user->uid, t('Applied recurring access to product <a href="@product-url">@product</a>.', array('@product-url' => url('node/'. $product->nid), '@product' => $product->nid)));
 
-  module_invoke('uc_recurring_access_apply', $fee, $product);
+  module_invoke_all('uc_recurring_access_apply', $fee, $product);
 }
 
 /**

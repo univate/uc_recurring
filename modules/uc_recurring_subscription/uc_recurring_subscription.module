@@ -296,6 +296,7 @@ function uc_recurring_subscription_uc_recurring_access_types_alter(&$access) {
  * Add access definitions for roles.
  */
 function uc_recurring_subscription_uc_recurring_access_apply($fee, $product) {
+  global $user;
   $subscription = uc_recurring_subscription_load($product->nid);
   // role rules
   foreach ($subscription->access['subscribe_grant'] as $rid) {
@@ -311,6 +312,7 @@ function uc_recurring_subscription_uc_recurring_access_apply($fee, $product) {
     }
     $access->time_applied += $fee->next_charge - time();
     uc_recurring_access_user_save($access);
+    uc_order_comment_save($fee->order_id, $user->uid, t('Applied recurring access to role id: @role.', array('@role' => $rid)));
   }
 }
 

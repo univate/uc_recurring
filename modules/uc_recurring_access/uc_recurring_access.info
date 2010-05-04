@@ -1,5 +1,6 @@
 name = Recurring Access
 description = Allow content to be restricted based on the length of paid membership.
 dependencies[] = uc_recurring
+dependencies[] = uc_recurring_product
 package = Ubercart - recurring
 core = 6.x
