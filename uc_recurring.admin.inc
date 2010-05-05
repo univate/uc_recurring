@@ -177,7 +177,7 @@ function uc_recurring_admin_edit_form($form_state, $rfid, $fee_handler) {
     $form['rfid'] = array(
       '#type' => 'hidden',
       '#value' => $rfid,
-    )
+    );
     $form['fee_title'] = array(
       '#type' => 'textfield',
       '#title' => t('Recurring order title'),
