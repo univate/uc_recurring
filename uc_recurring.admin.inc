@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.admin.inc,v 1.1.4.14 2010/05/05 04:15:42 univate Exp $
+// $Id: uc_recurring.admin.inc,v 1.1.4.15 2010/05/05 06:25:34 univate Exp $
 
 /**
  * @file
@@ -128,11 +128,8 @@ function uc_recurring_admin_charge_form($form_state, $rfid, $fee_handler) {
       'revision' => 'formatted-original',
       'location' => 'recurring-charge-form',
     );
-    $form['rfid'] = array(
-      '#type' => 'hidden',
-      '#value' => $fee->rfid
-    );
-
+    $form['rfid'] = array('#type' => 'hidden', '#value' => $rfid);
+    $form['referer'] = array('#type' => 'hidden', '#value' => uc_referer_uri());
     $form['message'] = array(
       '#value' => '<div>'. t('Are you sure you want to charge the customer @amount at this time?', array('@amount' => uc_price($fee->fee_amount, $context))) .'</div>',
     );
@@ -160,7 +157,10 @@ function uc_recurring_admin_charge_form_submit($form, &$form_state) {
     drupal_set_message(t('Attempt to charge recurring fee @fee failed.', array('@fee' => $rfid)), 'error');
   }
 
-  $form_state['redirect'] = 'admin/store/orders/recurring/view/fee/'. $rfid;
+  $form_state['redirect'] = $form_state['values']['referer'];
+  if (!empty($form_state['redirect'])) {
+    $form_state['redirect'] = 'admin/store/orders/recurring/view/fee/'. $rfid;
+  }
 }
 
 /**
@@ -174,10 +174,8 @@ function uc_recurring_admin_edit_form($form_state, $rfid, $fee_handler) {
 
     list($fee->regular_interval_value, $fee->regular_interval_unit) = explode(' ', $fee->regular_interval);
 
-    $form['rfid'] = array(
-      '#type' => 'hidden',
-      '#value' => $rfid,
-    )
+    $form['rfid'] = array('#type' => 'hidden', '#value' => $rfid);
+    $form['referer'] = array('#type' => 'hidden', '#value' => uc_referer_uri());
     $form['fee_title'] = array(
       '#type' => 'textfield',
       '#title' => t('Recurring order title'),
@@ -334,7 +332,10 @@ function uc_recurring_admin_edit_form_submit($form, &$form_state) {
     uc_recurring_fee_cancel($rfid, $fee);
   }
 
-  $form_state['redirect'] = 'admin/store/orders/recurring/view/fee/'. $rfid;
+  $form_state['redirect'] = $form_state['values']['referer'];
+  if (!empty($form_state['redirect'])) {
+    $form_state['redirect'] = 'admin/store/orders/recurring/view/fee/'. $rfid;
+  }
 }
 
 /**
