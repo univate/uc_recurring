@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.admin.inc,v 1.1.4.13 2010/04/22 04:43:32 univate Exp $
+// $Id: uc_recurring.admin.inc,v 1.1.4.14 2010/05/05 04:15:42 univate Exp $
 
 /**
  * @file
@@ -174,6 +174,10 @@ function uc_recurring_admin_edit_form($form_state, $rfid, $fee_handler) {
 
     list($fee->regular_interval_value, $fee->regular_interval_unit) = explode(' ', $fee->regular_interval);
 
+    $form['rfid'] = array(
+      '#type' => 'hidden',
+      '#value' => $rfid,
+    )
     $form['fee_title'] = array(
       '#type' => 'textfield',
       '#title' => t('Recurring order title'),
@@ -286,7 +290,7 @@ function uc_recurring_admin_edit_form_validate($form, &$form_state) {
 
 function uc_recurring_admin_edit_form_submit($form, &$form_state) {
   global $user;
-  $rfid = arg(4);
+  $rfid = $form_state['values']['rfid'];
   $fee = uc_recurring_fee_user_load($rfid);
 
   $member = user_load($fee->uid);
