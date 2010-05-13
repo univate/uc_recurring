@@ -144,12 +144,13 @@ function uc_recurring_access_views_api() {
  *
  * @see uc_recurring_process_order
  */
-function uc_recurring_access_order($op, &$order, $arg2) {
-  if ($op == 'submit') {
-    $fees = uc_recurring_get_fees($order);
-    foreach ($fees as $fee) {
-      uc_recurring_access_recurring_renewal_completed($order, $fee);
+function uc_recurring_access_uc_checkout_complete($order, $account) {
+  $fees = uc_recurring_get_fees($order);
+  foreach ($fees as $fee) {
+    if ($fee->uid == 0) { // check for anonymous uid
+      $fee->uid = $order->uid;
     }
+    uc_recurring_access_recurring_renewal_completed($order, $fee);
   }
 }
 
