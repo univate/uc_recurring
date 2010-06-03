@@ -133,7 +133,7 @@ function uc_recurring_upgrade_feature_form($form_state, $node, $feature) {
 }
 
 function uc_recurring_upgrade_feature_form_submit($form, &$form_state) {
-  dsm($form_state);
+  //dsm($form_state);
 
 }
 
