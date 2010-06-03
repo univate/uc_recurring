@@ -265,7 +265,7 @@ function uc_recurring_product_form_uc_cart_checkout_form_alter(&$form, $form_sta
     $valid = variable_get('uc_recurring_payment_methods', array());
     if (!empty($form['panes']['payment']['payment_method']['#options'])) {
       foreach (array_keys($form['panes']['payment']['payment_method']['#options']) as $key) {
-        if ($valid[$key] === 0 || !uc_recurring_payment_method_supported($key)) {
+        if ((isset($valid[$key]) && $valid[$key] === 0) || !uc_recurring_payment_method_supported($key)) {
           unset($form['panes']['payment']['payment_method']['#options'][$key]);
         }
       }

@@ -640,7 +640,10 @@ function uc_recurring_default_handler() {
  */
 function uc_recurring_payment_method_supported($payment_method) {
   $info = uc_recurring_get_recurring_info();
-  return !empty($info[$info[$payment_method]['fee handler']]);
+  if (isset($info[$payment_method]['fee handler'])) {
+    return !empty($info[$info[$payment_method]['fee handler']]);
+  }
+  return FALSE;
 }
 
 /**
