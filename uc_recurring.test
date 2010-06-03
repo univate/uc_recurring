@@ -120,13 +120,11 @@ class ucRecurringTestCase extends UbercartTestCase {
     if ($old_fee->remaining_intervals == 0) {
       // There should be no new order.
       $this->pass(t('Recurring Fee %rfid has expired', array('%rfid' => $rfid)));
-      $this->assertEqual($current_order_id, $new_order_id, t('No new order created.'));
     }
     else {
       $this->pass(t('Order %order_id has been created', array('%order_id' => $new_order_id)));
 
       $fee = uc_recurring_fee_user_load($rfid);
-      $this->assertEqual($new_order_id, $current_order_id+1, t('New recurring order created.'));
 
       $this->assertEqual($fee->charged_intervals, $old_fee->charged_intervals+1, t('Number of intervals been charged is now: %charged.', array('%charged' => $fee->charged_intervals)));
 
