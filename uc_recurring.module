@@ -377,8 +377,49 @@ function uc_recurring_uc_message() {
  *   The new order ID or FALSE if unable to renew fee.
  */
 function uc_recurring_renew($fee) {
-  // Process only fees that are handled by uc recurring or implementing modules.
-  // Paypal for example handles it's own recurring.
+  $order = uc_recurring_create_renewal_order($fee);
+
+  if (uc_recurring_charge_profile($fee, $order) !== FALSE) {
+    $order = uc_order_load($order->order_id);
+
+    // Add a comment in the old and new order history.
+    uc_order_comment_save($fee->order_id, $user->uid, t('New recurring fee processed, new order is <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'. $order->order_id), '@order_id' => $order->order_id)));
+    uc_order_comment_save($order->order_id, $user->uid, t('Order created as a recurring fee for order <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'. $fee->order_id), '@order_id' => $fee->order_id)));
+
+    // Set new intervals.
+    uc_recurring_set_intervals($fee);
+    // Add the new order ID to the fee object.
+    $fee->data['recurring orders'][$order->order_id] = $new_id;
+    // Save the fee object.
+    uc_recurring_fee_user_save($fee);
+
+    module_invoke_all('recurring_renewal_completed', $order, $fee);
+    ca_pull_trigger('uc_recurring_renewal_complete', $order, $fee);
+
+    // Return the new order ID.
+    return $order->order_id;
+  }
+  else {
+    // Charging failed.
+    if (!$fee->own_handler) {
+      uc_recurring_process_extensions($fee);
+    }
+
+    uc_order_comment_save($fee->order_id, $user->uid, t('Error: Recurring fee <a href="@orders-recurring-view">@fee</a> for product @model failed.', array('@orders-recurring-view' => url('admin/store/orders/recurring/view/fee/'. $fee->rfid), '@fee' => $fee->rfid, '@model' => $fee->data['model'])));
+    watchdog('uc_recurring', 'Failed to capture recurring fee of @amount for product @model on order @order_id.', array('@amount' => $fee->fee_amount, '@model' => $fee->data['model'], '@order_id' => $fee->order_id), WATCHDOG_ERROR, l(t('order !order_id', array('!order_id' => $fee->order_id)), 'admin/store/orders/'. $fee->order_id));
+
+    module_invoke_all('recurring_renewal_failed', $order, $fee);
+    ca_pull_trigger('uc_recurring_renewal_failed', $order, $fee);
+
+    uc_order_comment_save($fee->order_id, $user->uid, t('New recurring fee failed on order <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'. $order->order_id), '@order_id' => $order->order_id)));
+  }
+  return FALSE;
+}
+
+/**
+ * Create a new order to be renewed via a recurring profile.
+ */
+function uc_recurring_create_renewal_order($fee) {
   global $user;
   $order = uc_order_load($fee->order_id);
   $old_id = $order->order_id;
@@ -407,52 +448,37 @@ function uc_recurring_renew($fee) {
   uc_order_save($new_order);
   uc_order_update_status($new_id, 'pending');
 
+  // We load the order to pick up the 'pending' state.
   $new_order = uc_order_load($new_id);
 
-  // Invoke renew callback, assume renew successful unless FALSE is returned.
-  if (uc_recurring_invoke($fee->fee_handler, 'renew callback', array($new_order, &$fee)) !== FALSE) {
-    $new_order = uc_order_load($new_id);
+  return $new_order;
+}
 
-    // Add a comment in the old and new order history.
-    uc_order_comment_save($old_id, $user->uid, t('New recurring fee processed, new order is <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'. $new_id), '@order_id' => $new_id)));
-    uc_order_comment_save($new_id, $user->uid, t('Order created as a recurring fee for order <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'. $old_id), '@order_id' => $old_id)));
-
-    // Set new intervals.
-    uc_recurring_set_intervals($fee);
-    // Add the new order ID to the fee object.
-    $fee->data['recurring orders'][$new_id] = $new_id;
-    // Save the fee object.
-    uc_recurring_fee_user_save($fee);
-
-    module_invoke_all('recurring_renewal_completed', $new_order, $fee);
-    ca_pull_trigger('uc_recurring_renewal_complete', $new_order, $fee);
-
-    // Return the new order ID.
-    return $new_id;
+/**
+ * Process a charge on a recurring profile.
+ *
+ * Invokes the renew callback, assumes renewal is successful unless FALSE is
+ * returned.
+ *
+ * @param $fee
+ *   The recurring fee object.
+ * @param $order
+ *   The ubercart order object.
+ * @return
+ *   TRUE if order charged.
+ */
+function uc_recurring_charge_profile(&$fee, &$order = NULL) {
+  if (!isset($order)) {
+    $order = uc_recurring_create_order_renewal($fee);
   }
-  else {
-    // Charging failed.
-    if (!$fee->own_handler) {
-      uc_recurring_process_extensions($fee);
-    }
-
-    uc_order_comment_save($fee->order_id, $user->uid, t('Error: Recurring fee <a href="@orders-recurring-view">@fee</a> for product @model failed.', array('@orders-recurring-view' => url('admin/store/orders/recurring/view/fee/'. $fee->rfid), '@fee' => $fee->rfid, '@model' => $fee->data['model'])));
-    watchdog('uc_recurring', 'Failed to capture recurring fee of @amount for product @model on order @order_id.', array('@amount' => $fee->fee_amount, '@model' => $fee->data['model'], '@order_id' => $fee->order_id), WATCHDOG_ERROR, l(t('order !order_id', array('!order_id' => $fee->order_id)), 'admin/store/orders/'. $fee->order_id));
-
-    module_invoke_all('recurring_renewal_failed', $new_order, $fee);
-
-    ca_pull_trigger('uc_recurring_renewal_failed', $order, $fee);
-
-    uc_order_comment_save($old_id, $user->uid, t('New recurring fee failed on order <a href="@store-orders">@order_id</a>.', array('@store-orders' => url('admin/store/orders/'. $new_id), '@order_id' => $new_id)));
-  }
-  return FALSE;
+  return uc_recurring_invoke($fee->fee_handler, 'renew callback', array($order, &$fee));
 }
 
 /**
  * Process a fee expiration.
  *
- * @param #fee
- *   The fee object.
+ * @param $fee
+ *   The recurring fee object.
  */
 function uc_recurring_expire($fee) {
   $order = uc_order_load($fee->order_id);

@@ -26,6 +26,8 @@
  *   - "cancel callback": Function to call when cancelling a recurring fee.
  *   - "own handler": set to TRUE if this recurring handler will be responsible
  *     for processing renewals and not uc_recurring. (Default: FALSE)
+ *   - "saved profile": if set to TRUE then this payment method will be
+ *     available to other charges.
  *   - "menu": Array of menu items that provide the user operations.
  *     uc_recurring does provide some common default operations for charge,
  *     edit and cancel which can be reused by setting these to either:
@@ -48,6 +50,7 @@ function hook_recurring_info() {
     'renew callback' => 'uc_recurring_test_gateway_renew',
     'process callback' => 'uc_recurring_test_gateway_process',
     'own handler' => FALSE,
+    'saved profile' => FALSE,
     'menu' => array(
       'charge' => UC_RECURRING_MENU_DEFAULT,
       'edit' => array(
