@@ -17,16 +17,17 @@ function uc_recurring_uc_authorizenet_recurring_info() {
     'fee handler' => 'authorizenet_cim',
     'renew callback' => 'uc_recurring_authorizenet_cim_renew',
     'process callback' => 'uc_recurring_authorizenet_cim_process',
+    'saved profile' => TRUE,
     'menu' => array(
       'charge' => UC_RECURRING_MENU_DEFAULT,
       'edit'   => UC_RECURRING_MENU_DEFAULT,
       'update' => array(
-        'title' => 'Update Account Details', 
+        'title' => 'Update Account Details',
         'page arguments' => array('uc_recurring_authorizenet_cim_update_form'),
         'file' => 'modules/uc_recurring.uc_authorizenet.inc',
       ),
       'profile' => array(
-        'title' => 'CIM Profile', 
+        'title' => 'CIM Profile',
         'page arguments' => array('uc_recurring_authorizenet_cim_profile_form'),
         'access callback' => 'user_access',
         'access arguments' => array('administer recurring fees'),
@@ -199,7 +200,7 @@ function uc_recurring_authorizenet_cim_profile_form($form_state, $rfid) {
   $order = uc_order_load($fee->order_id);
   $ref_id = end(array_keys($order->data['cc_txns']['references']));
   $profile = _uc_authorizenet_cim_profile_get($order, $ref_id);
-  
+
   $header = array_keys($profile);
   $rows[] = array_values($profile);
 

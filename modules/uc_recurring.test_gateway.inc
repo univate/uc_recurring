@@ -17,6 +17,7 @@ function uc_recurring_test_gateway_recurring_info() {
     'fee handler' => 'test_gateway',
     'renew callback' => 'uc_recurring_test_gateway_renew',
     'process callback' => 'uc_recurring_test_gateway_process',
+    'saved profile' => TRUE,
     'menu' => array(
       'charge' => UC_RECURRING_MENU_DEFAULT,
       'edit'   => UC_RECURRING_MENU_DEFAULT,
