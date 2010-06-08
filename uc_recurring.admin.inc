@@ -155,8 +155,6 @@ function uc_recurring_admin_charge_form_submit($form, &$form_state) {
   else {
     drupal_set_message(t('Attempt to charge recurring fee @fee failed.', array('@fee' => $rfid)), 'error');
   }
-
-  $form_state['redirect'] = 'admin/store/orders/recurring/view/fee/'. $rfid;
 }
 
 /**
@@ -326,8 +324,6 @@ function uc_recurring_admin_edit_form_submit($form, &$form_state) {
   if ($fee->remaining_intervals != 0 && $number_intervals == 0) {
     uc_recurring_fee_cancel($rfid, $fee);
   }
-
-  $form_state['redirect'] = 'admin/store/orders/recurring/view/fee/'. $rfid;
 }
 
 /**
