@@ -1,0 +1,5 @@
+name = Recurring Product Fees
+description = Add recurring fees for products.
+dependencies[] = uc_recurring
+package = Ubercart - recurring
+core = 6.x
