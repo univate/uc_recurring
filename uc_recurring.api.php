@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.api.php,v 1.1.2.7 2009/10/27 02:35:43 univate Exp $
+// $Id: uc_recurring.api.php,v 1.1.2.8 2010/06/08 15:18:40 univate Exp $
 
 /**
  * Define the recurring payment method/gateway function callbacks.
