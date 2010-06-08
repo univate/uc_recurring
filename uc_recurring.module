@@ -1484,7 +1484,7 @@ function uc_recurring_get_fee_ops($context, $fee) {
           $full_path = 'user/'. $fee->uid .'/recurring/'. $fee->rfid .'/'. $path .'/'. $info['fee handler'];
         }
         if (menu_valid_path(array('link_path' => $full_path))) {
-          $ops[$path] = l($path, $full_path);
+          $ops[$path] = l($path, $full_path, array('query' => drupal_get_destination()));
         }
       }
     }
