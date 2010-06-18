@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_order.module,v 1.1.2.2 2010/04/28 02:00:19 univate Exp $
+// $Id: uc_recurring_order.module,v 1.1.2.3 2010/06/18 01:01:47 univate Exp $
 
 /**
  * @file
@@ -202,10 +202,12 @@ function uc_recurring_order_pane_checkout($op, &$arg1, $arg2) {
 
     case 'process':
       // Can't renew orders that include product with recurring payments.
-      if (($products = uc_recurring_get_recurring_products_in_order($order))) {
-        unset($_SESSION['uc_recurring_order']);
-        drupal_set_message(t('Unable to create recurring order when it contains recurring products'), 'warning');
-        return FALSE;
+      if (module_exists('uc_recurring_product')) {
+        if (($products = uc_recurring_product_get_recurring_products_in_order($order))) {
+          unset($_SESSION['uc_recurring_order']);
+          drupal_set_message(t('Unable to create recurring order when it contains recurring products'), 'warning');
+          return FALSE;
+        }
       }
 
       if ($arg2['recurring_option'] !== '0 months') {
