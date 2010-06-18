@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.module,v 1.1.4.83 2010/06/08 16:15:48 univate Exp $
+// $Id: uc_recurring.module,v 1.1.4.84 2010/06/18 01:20:19 univate Exp $
 
 /**
  * @file
@@ -472,7 +472,7 @@ function uc_recurring_create_renewal_order($fee) {
  */
 function uc_recurring_charge_profile(&$fee, &$order = NULL) {
   if (!isset($order)) {
-    $order = uc_recurring_create_order_renewal($fee);
+    $order = uc_recurring_create_renewal_order($fee);
   }
   return uc_recurring_invoke($fee->fee_handler, 'renew callback', array($order, &$fee));
 }

@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_hosted.module,v 1.1.2.12 2010/03/27 10:03:03 univate Exp $
+// $Id: uc_recurring_hosted.module,v 1.1.2.13 2010/06/18 01:01:07 univate Exp $
 
 /**
  * @file
@@ -485,8 +485,12 @@ function uc_recurring_hosted_paypal_wps_process($order, &$fee) {
 function uc_recurring_hosted_form_uc_paypal_wps_form_alter(&$form, $form_state) {
   $order = $form['#parameters'][2];
 
+  $recurring_fees = array();
   // if recurring fees exist in the order
-  $recurring_fees = uc_recurring_product_get_recurring_products_in_order($order);
+  if (module_exists('uc_recurring_product')) {
+    // uc_recurring_products support
+    $recurring_fees = uc_recurring_product_get_recurring_products_in_order($order);
+  }
 
   if (count($recurring_fees) > 0) {
     // TODO: what do we do if someone tries to order more then one subscription??
