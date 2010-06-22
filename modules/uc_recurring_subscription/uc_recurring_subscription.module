@@ -309,8 +309,11 @@ function uc_recurring_subscription_uc_recurring_access_apply($fee, $product) {
       $access->id = $rid;
       $access->new = TRUE;
       $access->time_applied = 0;
+      $access->time_owed = 0;
     }
-    $access->time_applied += $fee->next_charge - time();
+    $interval = $fee->next_charge - time();
+    $access->time_applied += min($interval, variable_get('uc_recurring_access_interval', '31536000'));
+    $access->time_owed += $interval;
     uc_recurring_access_user_save($access);
     uc_order_comment_save($fee->order_id, $user->uid, t('Applied recurring access to role id: @role.', array('@role' => $rid)));
   }

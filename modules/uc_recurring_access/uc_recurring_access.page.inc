@@ -201,14 +201,14 @@ function uc_recurring_access_product_autocomplete($string) {
     // search for product node id.
     $sql = "SELECT n.nid, n.title
             FROM {node} n
-              LEFT JOIN { uc_recurring_products} p ON p.nid = n.nid
+              LEFT JOIN { uc_recurring_product} p ON p.nid = n.nid
             WHERE n.nid LIKE '%d%%'
             GROUP BY n.nid";
   }
   else {
     $sql = "SELECT n.nid, n.title
             FROM {node} n
-              LEFT JOIN {uc_recurring_products} p ON p.nid = n.nid
+              LEFT JOIN {uc_recurring_product} p ON p.nid = n.nid
             WHERE n.title LIKE '%s%%'
             GROUP BY n.nid";
   }
