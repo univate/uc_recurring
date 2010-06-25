@@ -298,6 +298,9 @@ function uc_recurring_subscription_uc_recurring_access_types_alter(&$access) {
 function uc_recurring_subscription_uc_recurring_access_apply($fee, $product) {
   global $user;
   $subscription = uc_recurring_subscription_load($product->nid);
+  if (empty($subscription->access['subscribe_grant'])) {
+    return;
+  }
   // role rules
   foreach ($subscription->access['subscribe_grant'] as $rid) {
     $access = uc_recurring_access_user_load($fee->uid, 'role', $rid);
