@@ -1,5 +1,5 @@
 uc_recurring
-~~~~~
+~~~~~~~~~~~~
 
 uc_recurring is a drupal module to provide recurring billing to the ubercart project.
 
@@ -50,11 +50,15 @@ hook_recurring_info() function as this defines all the details uc_recurring
 needs to work with a new gateway.
 
 Credits
-*******
+~~~~~~~
 Ryan Szrama (http://www.commerceguys.com/)
 Chris Hood (http://www.univate.com.au/)
 
 LICENSE
 ~~~~~~~
+No guarantee is provided with this software, no matter how critical your
+information, module authors are not responsible for damage caused by this
+software or obligated in any way to correct problems you may experience.
 
 This software licensed under the GNU General Public License 2.0.
+http://www.gnu.org/licenses/gpl-2.0.txt
