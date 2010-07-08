@@ -171,12 +171,35 @@ function uc_recurring_access_recurring_renewal_completed(&$order, &$fee) {
     $access->id = $product->nid;
     $access->new = TRUE;
     $access->time_applied = 0;
+    $access->time_owed = 0;
   }
-  $access->time_applied += $fee->next_charge - time();
+  $interval = $fee->next_charge - time();
+  $access->time_applied += min($interval, variable_get('uc_recurring_access_interval', '31536000'));
+  $access->time_owed += $interval;
   uc_recurring_access_user_save($access);
   uc_order_comment_save($fee->order_id, $user->uid, t('Applied recurring access to product <a href="@product-url">@product</a>.', array('@product-url' => url('node/'. $product->nid), '@product' => $product->nid)));
 
   module_invoke_all('uc_recurring_access_apply', $fee, $product);
+}
+
+/**
+ * Apply
+ */
+function uc_recurring_access_cron() {
+  $time_now = time();
+  $last_applied = variable_get('uc_recurring_access_interval_last_applied', 0);
+  if ($last_applied == 0) {
+    variable_set('uc_recurring_access_interval_last_applied', time());
+  }
+ 
+  $interval = variable_get('uc_recurring_access_interval', '31536000');
+  if ($time_now - $last_applied >= $interval) {
+    $interval = $time_now - $last_applied; 
+    db_query("UPDATE {uc_recurring_access_user} SET time_applied = (time_applied + %d) WHERE time_applied < time_owed", $interval);
+    // incase any user have been overcredited
+    db_query("UPDATE {uc_recurring_access_user} set time_applied = time_owed WHERE time_applied > time_owed");
+    variable_set('uc_recurring_access_interval_last_applied', time());
+  }
 }
 
 /**
@@ -220,6 +243,19 @@ function uc_recurring_access_user_load($uid, $type = NULL, $id = NULL) {
     return $access[0];
   }
   return $access;
+}
+
+/**
+ *
+ */
+function uc_recurring_access_user_delete($uid, $type = NULL, $id = NULL) {
+  if (!isset($type)) {
+    db_query('DELETE FROM {uc_recurring_access_user} WHERE uid = %d', $uid);
+  }
+  else {
+    db_query("DELETE FROM {uc_recurring_access_user} WHERE uid = %d AND access_type = '%s' AND id = %d", $uid, $type, $id);
+  }
+  return SAVED_DELETED;
 }
 
 /**
@@ -275,6 +311,183 @@ function _uc_recurring_access_rules() {
   return $access_types;
 }
 
+
+/**
+ * Implementation of hook_user().
+ *
+ * Add access rules to users account page, so admins can alter.
+ */
+function uc_recurring_access_user($type, &$edit, &$account, $category = NULL) {
+  switch ($type) {
+    case 'delete':
+      return uc_recurring_access_user_delete($account);
+    case 'form':
+      return uc_recurring_access_user_form($edit, $account, $category);
+    case 'submit':
+      return uc_recurring_access_user_submit($edit, $account, $category);
+    case 'validate':
+      return uc_recurring_access_user_validate($edit, $account, $category);
+    case 'view':
+      //return uc_recurring_access_user_view($edit, $account);
+  }
+}
+
+/**
+ *
+ */
+function uc_recurring_access_user_form($edit, $account, $category) {
+  if (!(user_access('administer users') && user_access('administer recurring content')) || $category != 'account') {
+    return;
+  }
+
+  $form['uc_recurring_access'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Recurring Access'),
+    '#description' => t('Here you can view what recurring access permission this user has purchased, as well as edit the access on a users account.'),
+  );
+  
+  $form['uc_recurring_access']['recurring_access']['#theme'] = 'uc_recurring_access_items_items';
+  $form['uc_recurring_access']['recurring_access']['#tree'] = TRUE;
+
+  $access = uc_recurring_access_user_load($account->uid);
+  if (!is_array($access)) {
+    $access = array($access);
+  }
+  $rule_types = _uc_recurring_access_rules();
+  foreach($access as $access_rule) {
+    switch ($access_rule->access_type) {
+      case 'node':
+        $product = node_load($access_rule->id);
+        $value = l($product->title, 'nid/'. $access_rule->id);
+        break;
+      case 'role':
+        static $roles;
+        if (!isset($roles)) {
+          $roles = user_roles(TRUE);
+        }
+        $value = $roles[$access_rule->id];
+    }
+    $form['uc_recurring_access']['recurring_access'][$access_rule->access_type .'-'. $access_rule->id] = array(
+      'access_type' => array(
+        '#value' => $rule_types[$access_rule->access_type],
+      ),
+      'match' => array(
+        '#value' => $value,
+      ),
+      'delete' => array(
+        '#type' => 'checkbox',
+      ),
+      'time_applied' => array(
+        '#type' => 'textfield',
+        '#size' => 20,
+        '#default_value' => theme('uc_recurring_time', $access_rule->time_applied),
+      ),
+      'time_required' => array(
+        '#type' => 'textfield',
+        '#size' => 20,
+        '#default_value' => theme('uc_recurring_time', $access_rule->time_owed),
+      ),
+    );
+  }
+
+
+  // add new rule form
+  drupal_add_js('misc/autocomplete.js');
+  $rule_types = _uc_recurring_access_rules();
+  $form['uc_recurring_access']['recurring_access']['new']['access_type'] = array(
+    '#type' => 'select',
+    '#options' => array('' => 'Add recurring access rule for ...') + $rule_types,
+    '#ahah' => array(
+      'event' => 'change',
+      'path' => 'uc_recurring_access/ahah/access_type',
+      'wrapper' => 'recurring-access-type',
+      'method' => 'replace',
+      'effect' => 'fade',
+      'progress' => array(
+      ),
+    ),
+  );
+  $form['uc_recurring_access']['recurring_access']['new']['match'] = array(
+    '#value' => '<div id="recurring-access-type"></div>'
+  );
+  $form['uc_recurring_access']['recurring_access']['new']['time_applied'] = array(
+    '#type' => 'textfield',
+    '#description' => t('Enter a PHP time, e.g. 1 week'),
+    '#size' => 20,
+  );
+  $form['uc_recurring_access']['recurring_access']['new']['time_required'] = array(
+    '#type' => 'textfield',
+    '#description' => t('Enter a PHP time, e.g. 1 week'),
+    '#size' => 20,
+  );
+  return $form;
+}
+
+/**
+ *
+ */
+function uc_recurring_access_user_submit($edit, $account, $category) {
+  if (!(user_access('administer users') && user_access('administer recurring content')) || $category != 'account') {
+    return;
+  }
+
+  $access = uc_recurring_access_user_load($account->uid);
+  foreach ($edit['recurring_access'] as $id => $rule) {
+    if ($id == 'new' && !empty($edit['match'])) {
+      $access = new stdClass();
+      $access->uid = $account->uid;
+      $access->created = time();
+      $access->access_type = $rule['access_type'];
+      $access->id = $edit['match'];
+      $access->new = TRUE;
+      $access->time_applied = strtotime('+'. $rule['time_applied']) - time();
+      $access->time_owed = strtotime('+'. $rule['time_required']) - time();
+      uc_recurring_access_user_save($access);
+    }
+    else {
+      list($type, $id) = split('-', $id);
+      if (!empty($rule['delete'])) {
+        uc_recurring_access_user_delete($account->uid, $type, $id);
+      }
+      else {
+        $access = new stdClass();
+        $access->uid = $account->uid;
+        $access->created = time();
+        $access->access_type = $type;
+        $access->id = $id;
+        $access->time_applied = strtotime('+'. $rule['time_applied']) - time();
+        $access->time_owed = strtotime('+'. $rule['time_required']) - time();
+        uc_recurring_access_user_save($access);
+      }  
+    }
+  }
+}
+
+/**
+ *
+ */
+function uc_recurring_access_user_validate($edit, $account, $category) {
+  if (!(user_access('administer users') && user_access('administer recurring content')) || $category != 'account') {
+    return;
+  }
+  $message = t('Incorrect format for time value');
+  foreach ($edit['recurring_access'] as $id => $rule) {
+    if ($id != 'new') {
+      $time_applied = strtotime('+'. $rule['time_applied']);
+      if ($time_applied < 0) {
+        form_set_error('recurring_access', $message);
+      }
+      $time_required = strtotime('+'. $rule['time_required']);
+      if ($time_required <= 0) {
+        form_set_error('recurring_access', $message);
+      }
+      if ($time_applied > $time_required) {
+        form_set_error('recurring_access', t('The time applied to an account cannot be larger then the purchased time.'));
+      }
+    }
+  }
+}
+
 /**
  * Theme the node recurring access rules in a table.
  */
@@ -285,6 +498,10 @@ function theme_uc_recurring_access_items_items($form) {
     $row = array();
     $row[] = drupal_render($form[$key]['access_type']);
     $row[] = drupal_render($form[$key]['match']);
+    if (!empty($form[$key]['time_applied'])) {
+      $row[] = drupal_render($form[$key]['time_applied']);
+      $header = array(t('Access type'), t('ID / Object'), t('Time applied'), t('Purchased time'), t('Delete'));
+    }
     $row[] = drupal_render($form[$key]['time_required']);
     $row[] = drupal_render($form[$key]['delete']);
     $rows[] = $row;

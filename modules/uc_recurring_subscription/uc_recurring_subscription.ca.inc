@@ -265,8 +265,8 @@ function uc_recurring_subscription_action_revoke_role($order, $settings) {
   else {
     foreach ($order->products as $pid => $product) {
       $subscription = uc_recurring_subscription_load($product->nid);
-      if (!empty($subscription->roles[$settings['role_option']])) {
-        foreach ($subscription->roles[$settings['role_option']] as $rid => $role) {
+      if (!empty($subscription->access[$settings['role_option']])) {
+        foreach ($subscription->access[$settings['role_option']] as $rid => $role) {
           // @todo: we need to check other subscriptions to ensure that the role
           // is no longer required by another subscription.
           unset($account->roles[$rid]);

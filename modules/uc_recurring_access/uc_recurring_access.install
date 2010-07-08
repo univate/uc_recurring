@@ -36,6 +36,13 @@ function uc_recurring_access_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'time_owed' => array(
+        'description' => t('The number of seconds that has been owed to this access rule.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
       'access_type' => array(
         'description' => t('The object used to restrict access e.g node, role.'),
         'type' => 'varchar',
@@ -107,9 +114,11 @@ function uc_recurring_access_uninstall() {
 }
 
 /**
- *
+ * Add the time_owed field.
  */
-/*
 function uc_recurring_access_update_6000() {
+  $ret = array();
+  db_add_field($ret, 'uc_recurring_access_user', 'time_owed', array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0));
+  $ret[] = update_sql('UPDATE uc_recurring_access_user set time_owed=time_applied');
+  return $ret;
 }
-*/
