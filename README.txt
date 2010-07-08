@@ -40,6 +40,18 @@ emulates a credit card payment gateway and uc_recurring supports this gateway.
 If you are attempting to test if uc_recurring is setup correctly this is a good
 gateway to initally test against before setting up your own live gateway.
 
+If need to take snapshots of live databases with recurring fees setup ensure
+that cron is not running on your test site or recurring payments may be
+triggered from your test and live installs.
+
+A simple way to ensure recurring payments are not triggered on cron runs is to
+add the following php to your test sites settings.php
+
+<?php
+// disable ubercart recurring payments
+$conf['uc_recurring_trigger_renewals'] = FALSE;
+?>
+
 DEVELOPERS
 ~~~~~~~~~~
 This modules includes the file uc_recurring.api.php which is an attempt to
