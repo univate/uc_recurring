@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.admin.inc,v 1.1.4.17 2010/06/08 15:18:40 univate Exp $
+// $Id: uc_recurring.admin.inc,v 1.1.4.18 2010/07/08 08:06:47 univate Exp $
 
 /**
  * @file
@@ -27,11 +27,6 @@ function uc_recurring_admin() {
   if (empty($item['map']['5'])) {
     // Get all recurring fees in the system.
     $order = tablesort_sql($header);
-    $element = 0;
-    if (empty($_GET['page'])) {
-      $index = db_result(db_query("SELECT COUNT(*) FROM {uc_recurring_users} WHERE next_charge < NOW()"));
-      $_GET['page'] = $index / variable_get('uc_order_number_displayed', 30);
-    }
     $fees= uc_recurring_get_all_fees(TRUE, $order);
   }
   elseif ($item['map']['5'] == 'order') {
