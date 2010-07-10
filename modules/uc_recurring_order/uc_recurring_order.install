@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_order.install,v 1.1.2.1 2010/07/08 07:50:41 univate Exp $
+// $Id: uc_recurring_order.install,v 1.1.2.2 2010/07/10 06:10:05 univate Exp $
 
 /**
  * Remove variables that are just holding strings, if you want to edit strings
