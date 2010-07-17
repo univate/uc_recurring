@@ -1,5 +1,5 @@
 <?php
-// $Id$
+// $Id: uc_recurring_hosted.test,v 1.1.2.1 2010/07/17 05:59:34 univate Exp $
 
 /**
  * @file
@@ -97,7 +97,7 @@ class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
   /**
    * Mock return values from paypal
    */
-  function paypal_message($msg_type, $order_id, $amount = 0) { 
+  function paypal_message($msg_type, $order_id, $amount = 0) {
     $subscr_id = 'S-36L13190CF840735L';
     $lastname = 'lastname';
     $firstname = 'firstname';
@@ -163,7 +163,7 @@ class ucRecurringPaypalWPSTestCase extends ucRecurringTestCase {
       ),
       'subscr_failed' => array(
         'txn_type' => 'subscr_failed',
-        'subscr_id' => $subscr_id, 
+        'subscr_id' => $subscr_id,
         'last_name' => $lastname,
         'residence_country' => 'AU',
         'item_name' => $order_title,

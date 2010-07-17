@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_order.module,v 1.1.2.4 2010/07/08 07:48:50 univate Exp $
+// $Id: uc_recurring_order.module,v 1.1.2.5 2010/07/11 16:14:22 univate Exp $
 
 /**
  * @file
@@ -212,7 +212,12 @@ function uc_recurring_order_order($op, &$arg1, $arg2) {
   switch ($op) {
     // TODO: Allow admin to create a recurring order from "create order" page.
     case 'submit':
-      $recurring = $arg1->data['recurring_option'];
+      if (!isset($arg1->data['recurring_option'])) {
+        $recurring = $arg1->data['recurring_option'];
+      }
+      else {
+        $recurring = $_SESSION['recurring_option'];
+      }
       $next_renewal = strtotime('+'. $recurring);
       if ($next_renewal > time() && variable_get('uc_recurring_checkout_process', TRUE)) {
         if (uc_recurring_order_process_order($arg1, $recurring) === FALSE) {
