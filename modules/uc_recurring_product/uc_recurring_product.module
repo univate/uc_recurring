@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_product.module,v 1.1.2.2 2010/06/11 01:34:52 univate Exp $
+// $Id: uc_recurring_product.module,v 1.1.2.3 2010/07/17 07:36:55 univate Exp $
 
 /**
  * @file
@@ -350,17 +350,19 @@ function uc_recurring_product_process_order($order, $data = array()) {
     $return = array();
 
     // Create a new fee object.
-    $fee = new stdClass();
-    $fee->uid = $order->uid;
+    $fee_template = new stdClass();
+    $fee_template->uid = $order->uid;
 
-    $fee->fee_handler = $fee_handler['fee handler'];
+    $fee_template->fee_handler = $fee_handler['fee handler'];
 
-    $fee->created = time();
-    $fee->order_id = $order->order_id;
-    $fee->module = 'uc_recurring_product';
+    $fee_template->created = time();
+    $fee_template->order_id = $order->order_id;
+    $fee_template->module = 'uc_recurring_product';
 
     // Iterate over the products that require a fee.
     foreach ($products as $product) {
+      $fee = drupal_clone($fee_template);
+
       $product_fee = $product['recurring product'];
       $order_product_id = $product['product']->order_product_id;
 
@@ -396,7 +398,7 @@ function uc_recurring_product_process_order($order, $data = array()) {
         // Recurring processing was successful, get the fee.
         // We will save all fees together after we are sure all of them were
         // processed properly.
-        $fee_objects[] = drupal_clone($fee);
+        $fee_objects[] = $fee;
       }
       else {
         // We have an error, so break. No fee object was saved.
