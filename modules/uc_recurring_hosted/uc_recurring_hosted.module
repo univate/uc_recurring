@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_hosted.module,v 1.1.2.14 2010/07/31 13:17:20 univate Exp $
+// $Id: uc_recurring_hosted.module,v 1.1.2.15 2010/07/31 13:42:30 univate Exp $
 
 /**
  * @file
@@ -375,6 +375,11 @@ function uc_recurring_hosted_authorizenet_arb_process($order, &$fee) {
     return FALSE;
   }
   uc_order_comment_save($order->order_id, 0, t('Authorize.Net: ARB subscription created - @id', array('@id' => $data['subscriptionId'])));
+
+  // We need to save the rfid, we don't have it yet.
+  if (!$fee->rfid) {
+    $fee->rfid = uc_recurring_fee_user_save($fee);
+  }
 
   // Save the new credit reference to the database.
   uc_recurring_hosted_subscription_save($fee->rfid, $data['subscriptionId']);
