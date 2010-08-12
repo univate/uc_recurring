@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_order.module,v 1.1.2.5 2010/07/11 16:14:22 univate Exp $
+// $Id: uc_recurring_order.module,v 1.1.2.6 2010/07/31 16:12:10 univate Exp $
 
 /**
  * @file
@@ -28,31 +28,66 @@ function uc_recurring_order_menu() {
 /**
  * Settings for recurring orders
  */
-function uc_recurring_order_settings_form($form_state) {
+function uc_recurring_order_settings_form($form) {
   drupal_set_title(t('Recurring Order Settings'));
-  $intervals = _uc_recurring_order_recurring_options();
+
+  $intervals = variable_get('uc_recurring_order_interval_options', array());
+  foreach ($intervals as $int => $value) {
+    $options[] = $int . '|' . $value;
+  }
+  $options = !empty($options) ? implode("\n", $options): '';
+
+  $form = array();
   $form['interval_options'] = array(
-    '#type' => 'select',
-    '#multiple' => TRUE,
-    '#options' => $intervals,
-    '#default_value' => array_keys(variable_get('uc_recurring_order_interval_options', $intervals)),
+    '#type' => 'textarea',
+    '#required' => TRUE,
+    '#default_value' => $options,
     '#title' => t('Available Recurring Interval Options'),
+    '#description' => t('Enter one allowed interval per line, in the format time|label, for example: 1 day|Daily.  Times must be in valid <a href="@link">strotime</a> format.  To enter a 0 value (non-recurring), make sure to enter valid strotime such as "0 months"', array('@link' => url('http://php.net/manual/en/function.strtotime.php'))),
   );
 
   $form['submit'] = array(
     '#type' => 'submit',
-    '#value' => t('Save'),
+    '#value'=> t('Submit'),
   );
 
   return $form;
 }
 
-function uc_recurring_order_settings_form_submit($form, &$form_state) {
-  $intervals = array();
-  foreach ($form_state['values']['interval_options'] as $option) {
-    $intervals[$option] = $form['interval_options']['#options'][$option];
+function uc_recurring_order_settings_form_validate($form, &$form_state) {
+  $options = preg_split('/[\r\n]+/', $form_state['values']['interval_options']);
+  foreach ($options as $key => $value) {
+    $i = explode('|', $value);
+    if (strtotime($i[0])) {
+      $intervals[$i[0]] = (isset($i[1]) && $i[1] !=='') ? $i[1] : $i[0];
+    }
+    else {
+      $errors .= t('!error is not valid strtotime format <br />', array('!error' => $i[0]));
+    }
   }
-  variable_set('uc_recurring_order_interval_options', $intervals);
+  if ($errors) {
+    return form_set_error('interval_options', $errors);
+  }
+  $form_state['values']['intervals'] = $intervals;
+}
+
+function uc_recurring_order_settings_form_submit($form, &$form_state) {
+  variable_set('uc_recurring_order_interval_options', $form_state['values']['intervals']);
+  drupal_set_message(t('The recurring options have been saved.'));
+}
+
+/**
+ * Callback function to return interval options
+ *
+ * @return
+ *   An array of interval options
+ */
+function uc_recurring_order_get_intervals() {
+  $options = variable_get('uc_recurring_order_interval_options', array());
+  foreach($options as $key => $option) {
+    $options[check_plain($key)] = check_plain($option);
+  }
+  return $options;
 }
 
 /**
@@ -74,7 +109,8 @@ function uc_recurring_order_cart_pane($items) {
  * Cart pane recurring form.
  */
 function uc_recurring_order_pane_cart($form_state) {
-  $intervals = variable_get('uc_recurring_order_interval_options', _uc_recurring_order_recurring_options());
+  $intervals = uc_recurring_order_get_intervals();
+
   if (empty($intervals)) {
     return;
   }
@@ -82,7 +118,7 @@ function uc_recurring_order_pane_cart($form_state) {
   $form['recurring_option'] = array(
     '#type' => 'select',
     '#title' => t('Recurring Order'),
-    '#description' => t('Select to have this order automatically repeat,'),
+    '#description' => t('Select to have this order automatically repeat.'),
     '#options' => $intervals,
     '#default_value' => $_SESSION['recurring_option'],
   );
@@ -95,30 +131,16 @@ function uc_recurring_order_pane_cart($form_state) {
 
 function uc_recurring_order_pane_cart_submit($form, &$form_state) {
   if ($form_state['values']['recurring_option']) {
-    $recurring_options = _uc_recurring_order_recurring_options();
     $recurring_option = $form_state['values']['recurring_option'];
     $next_renewal = strtotime('+'. $recurring_option);
-    if ($next_renewal > 0) {
+    if ($next_renewal > time()) {
       $_SESSION['recurring_option'] = $recurring_option;
       drupal_set_message(t('Your next order after this will occur on @next.', array('@recurring' => $recurring_options[$recurring], '@next' => format_date($next_renewal, 'short'))));
     }
     else {
-      unset($_SESSION['uc_recurring_order']);
+      unset($_SESSION['recurring_option']);
     }
   }
-}
-
-/**
- * Default options
- */
-function _uc_recurring_order_recurring_options() {
-  return array(
-    '0 months' => t('Single order (not recurring)'),
-    '1 months' => t('Monthly order'),
-    '3 months' => t('Every Three Months'),
-    '6 months' => t('Every 6 Months'),
-    '12 months' => t('Once a year'),
-  );
 }
 
 /**
@@ -148,10 +170,12 @@ function uc_recurring_order_checkout_pane() {
 function uc_recurring_order_pane_checkout($op, &$arg1, $arg2) {
   switch ($op) {
     case 'view':
-      $intervals = variable_get('uc_recurring_order_interval_options', _uc_recurring_order_recurring_options());
+      $intervals = uc_recurring_order_get_intervals();
+
       if (empty($intervals)) {
         return;
       }
+
       // Use recurring order info from cart pane if available.
       if ($_SESSION['recurring_option']) {
         $recurring = $_SESSION['recurring_option'];
@@ -174,22 +198,18 @@ function uc_recurring_order_pane_checkout($op, &$arg1, $arg2) {
       // Can't renew orders that include product with recurring payments.
       if (module_exists('uc_recurring_product')) {
         if (($products = uc_recurring_product_get_recurring_products_in_order($order))) {
-          unset($_SESSION['uc_recurring_order']);
+          unset($_SESSION['recurring_option']);
           drupal_set_message(t('Unable to create recurring order when it contains recurring products'), 'warning');
           return FALSE;
         }
       }
-
-      if ($arg2['recurring_option'] !== '0 months') {
-        $recurring_options = _uc_recurring_order_recurring_options();
-        $recurring = $arg2['recurring_option'];
-        $next_renewal = strtotime('+'. $recurring);
-        if ($next_renewal > 0) {
-          $arg1->data['recurring_option'] = $recurring;
-        }
-        else {
-          unset($_SESSION['recurring']);
-        }
+      $recurring = $arg2['recurring_option'];
+      $next_renewal = strtotime('+'. $recurring);
+      if ($next_renewal > time()) {
+        $arg1->data['recurring_option'] = $recurring;
+      }
+      else {
+        unset($_SESSION['recurring_option']);
       }
       return TRUE;
 
@@ -212,12 +232,7 @@ function uc_recurring_order_order($op, &$arg1, $arg2) {
   switch ($op) {
     // TODO: Allow admin to create a recurring order from "create order" page.
     case 'submit':
-      if (!isset($arg1->data['recurring_option'])) {
-        $recurring = $arg1->data['recurring_option'];
-      }
-      else {
-        $recurring = $_SESSION['recurring_option'];
-      }
+      $recurring = $arg1->data['recurring_option'];
       $next_renewal = strtotime('+'. $recurring);
       if ($next_renewal > time() && variable_get('uc_recurring_checkout_process', TRUE)) {
         if (uc_recurring_order_process_order($arg1, $recurring) === FALSE) {
