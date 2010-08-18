@@ -58,13 +58,6 @@ function uc_recurring_product_schema() {
         'not null' => TRUE,
         'default' => -1,
       ),
-      'nid' => array(
-        'description' => t('The ID of the node this role feature is attached to.'),
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
     ),
     'primary key' => array('pfid'),
   );
@@ -89,3 +82,11 @@ function uc_recurring_product_uninstall() {
   cache_clear_all('variables', 'cache');
 }
 
+/**
+ * Remove nid field.
+ */
+function uc_recurring_product_update_6000() {
+  $ret = array();
+  db_drop_field($ret, 'uc_recurring_product', 'nid');
+  return $ret;
+}

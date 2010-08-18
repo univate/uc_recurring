@@ -489,7 +489,7 @@ function uc_recurring_product_get_recurring_products_in_order($order) {
     }
     if ($products) {
       // Get recurring products according to the products node IDs in the order.
-      $result = db_query("SELECT * FROM {uc_recurring_product} WHERE nid IN (". db_placeholders($nids) .")", $nids);
+      $result = db_query("SELECT p.* FROM {uc_recurring_product} p LEFT JOIN {uc_product_features} f ON p.pfid=f.pfid WHERE f.nid IN (". db_placeholders($nids) .")", $nids);
 
       while ($row = db_fetch_object($result)) {
         foreach ($products[$row->nid] as $key => $product) {
