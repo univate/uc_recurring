@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.module,v 1.1.4.84 2010/06/18 01:20:19 univate Exp $
+// $Id: uc_recurring.module,v 1.1.4.85 2010/09/10 07:22:10 univate Exp $
 
 /**
  * @file
@@ -33,6 +33,8 @@ define('UC_RECURRING_MENU_DEFAULT', 1);
  */
 define('UC_RECURRING_FEE_STATUS_ACTIVE', 0);
 define('UC_RECURRING_FEE_STATUS_EXPIRED', 1);
+define('UC_RECURRING_FEE_STATUS_CANCELLED', 2);
+define('UC_RECURRING_FEE_STATUS_SUSPENDED',3);
 
 /**
  * Recurring access.
@@ -760,6 +762,8 @@ function uc_recurring_fee_cancel($rfid, $fee = NULL) {
   }
   $remaining = $fee->remaining_intervals;
   $fee->remaining_intervals = 0;
+  $fee->status = UC_RECURRING_FEE_STATUS_CANCELLED;
+
   // Add a timestamp to the user cancellation.
   $fee->data['cancel'] = time();
   uc_recurring_fee_user_save($fee);
@@ -837,7 +841,7 @@ function uc_recurring_get_fees_for_expiration() {
  */
 function uc_recurring_get_all_fees($pager = FALSE, $order = '') {
   $fees= array();
-  $sql = "SELECT * FROM {uc_recurring_users}". $order;
+  $sql = "SELECT ru.*, u.name FROM {uc_recurring_users} ru LEFT JOIN {users} u ON u.uid=ru.uid". $order;
   if ($pager) {
     $result = pager_query($sql, variable_get('uc_order_number_displayed', 30));
   }
@@ -863,7 +867,7 @@ function uc_recurring_get_all_fees($pager = FALSE, $order = '') {
  */
 function uc_recurring_get_user_fees($uid) {
   $fees= array();
-  $result = db_query("SELECT * FROM {uc_recurring_users} WHERE uid = %d AND remaining_intervals <> 0 ORDER BY order_id DESC", $uid);
+  $result = db_query("SELECT * FROM {uc_recurring_users} WHERE uid = %d AND status <> %d ORDER BY order_id DESC", $uid, UC_RECURRING_FEE_STATUS_EXPIRED);
   while ($fee = db_fetch_object($result)) {
     $fees[$fee->rfid] = $fee;
   }
@@ -895,6 +899,7 @@ function uc_recurring_user_access($account = NULL, $rfid = NULL, $op = '') {
   if (isset($rfid)) {
     $fee = uc_recurring_fee_user_load($rfid);
     $access = module_invoke_all('recurring_access', $fee, $op, $account);
+
     if (in_array(UC_RECURRING_ACCESS_DENY, $access, TRUE)) {
       return FALSE;
     }
@@ -911,44 +916,83 @@ function uc_recurring_user_access($account = NULL, $rfid = NULL, $op = '') {
 
 /**
  * Displays a table for users to administer their recurring fees.
+ *
+ * TODO: This theme function should receive as an argument the fees to be
+ * included in the table, not simply a user ID. All the logic to load fees
+ * should be taken care of in the function that calls this theme function.
  */
 function theme_uc_recurring_user_table($uid) {
-  $rows = array();
-  $output = '';
+  drupal_add_css(drupal_get_path('module', 'uc_recurring') .'/uc_recurring.css');
 
   // Set up a header array for the table.
-  $header = array(t('Order'), t('Amount'), t('Interval'), t('Next charge'), t('Remaining'), t('Operations'));
+  $header = array(t('Order'), t('Amount'), t('Interval'), t('Next charge'), t('Status'), t('Remaining'), t('Options'));
 
   $context = array(
     'revision' => 'themed-original',
     'location' => 'recurring-user-table',
   );
 
-  $fees = uc_recurring_get_user_fees($uid);
-  foreach ($fees as $fee) {
+  $recurring_states = uc_recurring_fee_status_label();
+
+  // Build an array of rows representing the user's fees.
+  $rows = array();
+
+  foreach (uc_recurring_get_user_fees($uid) as $fee) {
+    // Get the user operations links for the current fee.
     $ops = uc_recurring_get_fee_ops('user', $fee);
 
     // Add the row to the table for display.
     $rows[] = array(
-      l($fee->order_id, 'user/'. $uid .'/order/'. $fee->order_id),
-      uc_price($fee->fee_amount, $context),
-      array('data' => check_plain($fee->regular_interval), 'nowrap' => 'nowrap'),
-      format_date($fee->next_charge, 'small'),
-      $fee->remaining_intervals < 0 ? t('Until cancelled') : $fee->remaining_intervals,
-      array('data' => implode('|', $ops), 'nowrap' => 'nowrap'),
+      'data' => array(
+        l($fee->order_id, 'user/'. $uid .'/order/'. $fee->order_id),
+        uc_price($fee->fee_amount, $context),
+        array('data' => check_plain($fee->regular_interval), 'nowrap' => 'nowrap'),
+        format_date($fee->next_charge, 'small'),
+        '<span class="recurring-status-'. intval($fee->status) .'">'. $recurring_states[$fee->status] .'</span>',
+        $fee->remaining_intervals < 0 ? t('Until cancelled') : $fee->remaining_intervals,
+        array('data' => implode(' | ', $ops), 'nowrap' => 'nowrap'),
+      ),
     );
   }
 
-  // Only display the table if fees were found.
-  if (!empty($rows)) {
-    $output = theme('table', $header, $rows);
+  if (empty($rows)) {
+    $rows[] = array(array('data' => t('Your account has no recurring fees.'), 'colspan' => 7));
   }
-  return $output;
+
+  return theme('table', $header, $rows);
 }
 
 /*******************************************************************************
  * Helper Functions
  ******************************************************************************/
+
+/**
+ * Returns the human readable labels for defined statuses.
+ *
+ * @param $status
+ *   Optionally specify a status and return only its label.
+ *
+ * @return
+ *   An array of recurring fee status labels or a single label if specified.
+ */
+function uc_recurring_fee_status_label($status = NULL) {
+  // Define the array for defined statuses.
+  $status_labels = array(
+    UC_RECURRING_FEE_STATUS_ACTIVE => t('Active'),
+    UC_RECURRING_FEE_STATUS_EXPIRED => t('Expired'),
+    UC_RECURRING_FEE_STATUS_CANCELLED => t('Cancelled'),
+    UC_RECURRING_FEE_STATUS_SUSPENDED => t('Suspended'),
+  );
+
+  drupal_alter('uc_recurring_status', $status_labels);
+
+  // Return the specific status if specified.
+  if (!is_null($status)) {
+    return isset($status_labels[$status]) ? $status_labels[$status] : FALSE;
+  }
+
+  return $status_labels;
+}
 
 /**
  * Get the data of the handlers, keyed by the fee handler.
@@ -1009,4 +1053,3 @@ function uc_recurring_set_intervals(&$fee) {
   $fee->attempts = 0;
   $fee->data['extension'] = 0;
 }
-

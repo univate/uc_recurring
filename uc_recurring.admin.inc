@@ -1,70 +1,105 @@
 <?php
-// $Id: uc_recurring.admin.inc,v 1.1.4.18 2010/07/08 08:06:47 univate Exp $
+// $Id: uc_recurring.admin.inc,v 1.1.4.19 2010/09/10 07:22:10 univate Exp $
 
 /**
  * @file
- * Recurring payments administration menu items.
- *
+ * Recurring payments administration page callbacks and form builder functions.
  */
 
-// Displays a table for the administration of recurring fees.
+/**
+ * Displays a table for the administration of recurring fees.
+ */
 function uc_recurring_admin() {
   $item = menu_get_item();
 
-  $fees = array();
-
+  // Build the table header.
   $header = array(
-    array('data' => t('ID'), 'field' => 'rfid'),
-    array('data' => t('Order'), 'field' => 'order_id'),
+    array('data' => t('ID'), 'field' => 'ru.rfid'),
+    array('data' => t('Order'), 'field' => 'ru.order_id'),
+    array('data' => t('Status'), 'field' => 'ru.status'),
+    array('data' => t('Account')),
+    array('data' => t('Next'), 'field' => 'ru.next_charge', 'sort' => 'asc'),
     array('data' => t('Amount')),
-    array('data' => t('Next'), 'field' => 'next_charge', 'sort' => 'asc'),
     array('data' => t('Interval')),
     array('data' => t('Left')),
     array('data' => t('Total')),
     array('data' => t('Operations')),
   );
 
+  // Add the filter form to the top of the table.
+  $output .= drupal_get_form('uc_recurring_admin_filter_form', $item);
+
+  // Build an array of fees to include in the admin table.
+  $fees = array();
+  $footer_link = FALSE;
+
+  // If we're on the overview page listing all fees...
   if (empty($item['map']['5'])) {
     // Get all recurring fees in the system.
     $order = tablesort_sql($header);
-    $fees= uc_recurring_get_all_fees(TRUE, $order);
+    $fees = uc_recurring_get_all_fees(TRUE, $order);
   }
   elseif ($item['map']['5'] == 'order') {
-    // Get all recurring fees in an order.
-    $order = uc_order_load($item['map']['6']);
-    $fees = uc_recurring_get_fees($order);
+    // Get all recurring fees in a specific order if it is valid.
+    if ($order = uc_order_load($item['map']['6'])) {
+      $fees = uc_recurring_get_fees($order);
+      $footer_link = TRUE;
+    }
   }
   elseif ($fee = uc_recurring_fee_user_load($item['map'][6])) {
-    // Get single recurring fee.
+    // Get a single recurring fee.
     $fees[] = $fee;
+    $footer_link = TRUE;
   }
 
-  $output = drupal_get_form('uc_recurring_admin_filter_form', $item);
-  if ($fees) {
+  $recurring_states = uc_recurring_fee_status_label();
+
+  // If we actually found fees to display...
+  if (!empty($fees)) {
     $context = array(
       'revision' => 'themed-original',
       'location' => 'recurring-admin',
     );
 
     foreach ($fees as $fee) {
+      if ($fee->remaining_intervals < 0) {
+        $fee_remaining = t('Until cancelled');
+      }
+      elseif ($fee->remaining_intervals == 0) {
+        $fee_remaining = '-';
+      }
+      else {
+        $fee_remaining = $fee->remaining_intervals;
+      }
+
+      // Get the administrator operations links for the current fee.
       $ops = uc_recurring_get_fee_ops('fee_admin', $fee);
+
+      // Add a row for the current fee to the table.
       $rows[] = array(
         l($fee->rfid, 'admin/store/orders/recurring/view/fee/'. $fee->rfid),
         l($fee->order_id, 'admin/store/orders/'. $fee->order_id),
-        $fee->fee_amount != '0.00' ? uc_price($fee->fee_amount, $context) : t('Same as product price'),
+        $recurring_states[$fee->status],
+        l($fee->name, 'user/'. $fee->uid),
         format_date($fee->next_charge, 'small'),
+        $fee->fee_amount != '0.00' ? uc_price($fee->fee_amount, $context) : t('Same as product price'),
         array('data' => check_plain($fee->regular_interval), 'nowrap' => 'nowrap'),
-        $fee->remaining_intervals < 0 ? t('Until cancelled') : $fee->remaining_intervals,
+        $fee_remaining,
         $fee->remaining_intervals < 0 ? $fee->charged_intervals : $fee->remaining_intervals + $fee->charged_intervals,
-        array('data' => implode(' ', $ops), 'nowrap' => 'nowrap'),
+        array('data' => implode(' | ', $ops), 'nowrap' => 'nowrap'),
       );
     }
 
+    // Add the table and pager to the page output.
     $output .= theme('table', $header, $rows);
     $output .= theme('pager', NULL, variable_get('uc_order_number_displayed', 30), 0);
 
   }
-  $output .= l(t('Back to the full list'), 'admin/store/orders/recurring');
+
+  // Display a link back to the full list if necessary.
+  if ($footer_link) {
+    $output .= l(t('Back to the full list'), 'admin/store/orders/recurring');
+  }
 
   return $output;
 }
