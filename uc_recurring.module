@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.module,v 1.1.4.85 2010/09/10 07:22:10 univate Exp $
+// $Id: uc_recurring.module,v 1.1.4.86 2010/09/10 12:08:58 univate Exp $
 
 /**
  * @file
@@ -80,11 +80,33 @@ function uc_recurring_menu() {
     'title' => 'Recurring fees',
     'description' => 'View the recurring fees on your orders.',
     'page callback' => 'uc_recurring_admin',
+    'page arguments' => array(NULL, NULL),
     'access arguments' => array('administer recurring fees'),
     'type' => MENU_NORMAL_ITEM,
     'weight' => 5,
     'file' => 'uc_recurring.admin.inc',
   );
+  $items['admin/store/orders/recurring/view/fee/%'] = array(
+    'title' => 'Recurring fees',
+    'description' => 'View a specific recurring fee.',
+    'page callback' => 'uc_recurring_admin',
+    'page arguments' => array(5, 6),
+    'access arguments' => array('administer recurring fees'),
+    'type' => MENU_CALLBACK,
+    'weight' => 5,
+    'file' => 'uc_recurring.admin.inc',
+  );
+  $items['admin/store/orders/recurring/view/order/%'] = array(
+    'title' => 'Recurring fees',
+    'description' => 'View the recurring fees on a specific order.',
+    'page callback' => 'uc_recurring_admin',
+    'page arguments' => array(5, 6),
+    'access arguments' => array('administer recurring fees'),
+    'type' => MENU_CALLBACK,
+    'weight' => 5,
+    'file' => 'uc_recurring.admin.inc',
+  );
+
   $items['user/%user/recurring-fees'] = array(
     'title' => 'Recurring fees',
     'description' => 'View current recurring fees.',
@@ -94,22 +116,13 @@ function uc_recurring_menu() {
     'access arguments' => array(1),
     'type' => MENU_LOCAL_TASK,
   );
-  $items['admin/store/orders/recurring/view/fee/%'] = array(
+  $items['admin/store/orders/%/recurring'] = array(
     'title' => 'Recurring fees',
-    'description' => 'View a specific recurring fee.',
-    'page callback' => 'uc_recurring_admin',
+    'description' => 'Recurring fees associated with this order.',
+    'page callback' => 'uc_recurring_order_information',
+    'page arguments' => array(3),
     'access arguments' => array('administer recurring fees'),
-    'type' => MENU_NORMAL_ITEM,
-    'weight' => 5,
-    'file' => 'uc_recurring.admin.inc',
-  );
-  $items['admin/store/orders/recurring/view/order/%'] = array(
-    'title' => 'Recurring fees',
-    'description' => 'View the recurring fees on a specific order.',
-    'page callback' => 'uc_recurring_admin',
-    'access arguments' => array('administer recurring fees'),
-    'type' => MENU_NORMAL_ITEM,
-    'weight' => 5,
+    'type' => MENU_LOCAL_TASK,
     'file' => 'uc_recurring.admin.inc',
   );
 
@@ -161,6 +174,9 @@ function uc_recurring_theme() {
   return array(
     'uc_recurring_user_table' => array(
       'arguments' => array('uid' => NULL),
+    ),
+    'uc_recurring_admin_table' => array(
+      'arguments' => array('fees' => NULL),
     ),
   );
 }
@@ -390,8 +406,11 @@ function uc_recurring_renew($fee) {
 
     // Set new intervals.
     uc_recurring_set_intervals($fee);
-    // Add the new order ID to the fee object.
-    $fee->data['recurring orders'][$order->order_id] = $new_id;
+    // Add the new order ID to database.
+    $recurring_order = new stdClass();
+    $recurring_order->original_order_id = $fee->order_id;
+    $recurring_order->renewal_order_id = $order->order_id;
+    drupal_write_record('uc_recurring_orders', $recurring_order);
     // Save the fee object.
     uc_recurring_fee_user_save($fee);
 
@@ -798,7 +817,7 @@ function uc_recurring_get_fees($order, $reset = FALSE) {
         $products[$value->order_product_id] = $value->order_product_id;
       }
 
-      $result = db_query("SELECT * FROM {uc_recurring_users} WHERE order_product_id IN (". db_placeholders($products) .")", $products);
+      $result = db_query("SELECT ru.*, u.name FROM {uc_recurring_users} ru LEFT JOIN {users} u ON u.uid=ru.uid WHERE order_product_id IN (". db_placeholders($products) .")", $products);
 
       while ($fee = db_fetch_object($result)) {
         $fee->data = unserialize($fee->data);
@@ -960,6 +979,71 @@ function theme_uc_recurring_user_table($uid) {
   }
 
   return theme('table', $header, $rows);
+}
+
+/**
+ * Displays a table for users to administer their recurring fees.
+ *
+ * TODO: This theme function should receive as an argument the fees to be
+ * included in the table, not simply a user ID. All the logic to load fees
+ * should be taken care of in the function that calls this theme function.
+ */
+function theme_uc_recurring_admin_table($fees) {
+  // Build the table header.
+  $header = array(
+    array('data' => t('ID'), 'field' => 'ru.rfid'),
+    array('data' => t('Order'), 'field' => 'ru.order_id'),
+    array('data' => t('Status'), 'field' => 'ru.status'),
+    array('data' => t('Account')),
+    array('data' => t('Next'), 'field' => 'ru.next_charge', 'sort' => 'asc'),
+    array('data' => t('Amount')),
+    array('data' => t('Interval')),
+    array('data' => t('Left')),
+    array('data' => t('Total')),
+    array('data' => t('Operations')),
+  );
+
+  $context = array(
+    'revision' => 'themed-original',
+    'location' => 'recurring-admin',
+  );
+
+  $recurring_states = uc_recurring_fee_status_label();
+
+  foreach ($fees as $fee) {
+    if ($fee->remaining_intervals < 0) {
+      $fee_remaining = t('Until cancelled');
+    }
+    elseif ($fee->remaining_intervals == 0) {
+      $fee_remaining = '-';
+    }
+    else {
+      $fee_remaining = $fee->remaining_intervals;
+    }
+
+    // Get the administrator operations links for the current fee.
+    $ops = uc_recurring_get_fee_ops('fee_admin', $fee);
+
+    // Add a row for the current fee to the table.
+    $rows[] = array(
+      l($fee->rfid, 'admin/store/orders/recurring/view/fee/'. $fee->rfid),
+      l($fee->order_id, 'admin/store/orders/'. $fee->order_id),
+      $recurring_states[$fee->status],
+      l($fee->name, 'user/'. $fee->uid),
+      format_date($fee->next_charge, 'small'),
+      $fee->fee_amount != '0.00' ? uc_price($fee->fee_amount, $context) : t('Same as product price'),
+      array('data' => check_plain($fee->regular_interval), 'nowrap' => 'nowrap'),
+      $fee_remaining,
+      $fee->remaining_intervals < 0 ? $fee->charged_intervals : $fee->remaining_intervals + $fee->charged_intervals,
+      array('data' => implode(' | ', $ops), 'nowrap' => 'nowrap'),
+    );
+  }
+
+  // Add the table and pager to the page output.
+  $output .= theme('table', $header, $rows);
+  $output .= theme('pager', NULL, variable_get('uc_order_number_displayed', 30), 0);
+  
+  return $output;
 }
 
 /*******************************************************************************

@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_order.module,v 1.1.2.6 2010/07/31 16:12:10 univate Exp $
+// $Id: uc_recurring_order.module,v 1.1.2.7 2010/09/10 12:08:58 univate Exp $
 
 /**
  * @file
@@ -291,7 +291,6 @@ function uc_recurring_order_process_order($order, $recurring) {
       'uc_recurring_order' => array(
         'products' => $products,
       ),
-      'recurring orders' => array(),
     );
     $fee->attempts = 0;
     $fee->pfid = NULL;
