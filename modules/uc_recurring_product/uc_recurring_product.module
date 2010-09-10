@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_product.module,v 1.1.2.4 2010/08/26 03:53:22 univate Exp $
+// $Id: uc_recurring_product.module,v 1.1.2.6 2010/09/10 12:08:58 univate Exp $
 
 /**
  * @file
@@ -383,7 +383,6 @@ function uc_recurring_product_process_order($order, $data = array()) {
         'model' => $product_fee->model,
         'nid' => $product_fee->nid,
         'qty' => $product['product']->qty,
-        'recurring orders' => array(),
         'extension' => 0,
       ) + $data;
       $fee->attempts = 0;
@@ -489,7 +488,10 @@ function uc_recurring_product_get_recurring_products_in_order($order) {
     }
     if ($products) {
       // Get recurring products according to the products node IDs in the order.
-      $result = db_query("SELECT p.* FROM {uc_recurring_product} p LEFT JOIN {uc_product_features} f ON p.pfid=f.pfid WHERE f.nid IN (". db_placeholders($nids) .")", $nids);
+      $result = db_query("SELECT p.pfid, p.model, p.fee_amount, p.initial_charge, p.regular_interval, p.number_intervals, f.nid
+                          FROM {uc_recurring_product} p
+                            LEFT JOIN {uc_product_features} f ON p.pfid=f.pfid
+                          WHERE f.nid IN (". db_placeholders($nids) .")", $nids);
 
       while ($row = db_fetch_object($result)) {
         foreach ($products[$row->nid] as $key => $product) {
@@ -528,7 +530,10 @@ function uc_recurring_product_fee_product_save($product) {
  *   The product fee object.
  */
 function uc_recurring_product_fee_load($pfid) {
-  $product = db_fetch_object(db_query("SELECT * FROM {uc_recurring_product} WHERE pfid = %d", $pfid));
+  $result = db_query("SELECT pfid, model, fee_amount, initial_charge, regular_interval, number_intervals
+                      FROM {uc_recurring_product}
+                      WHERE pfid = %d", $pfid);
+  $product = db_fetch_object($results);
 
   list($product->initial_charge_value, $product->initial_charge_unit) = explode(' ', $product->initial_charge);
   list($product->regular_interval_value, $product->regular_interval_unit) = explode(' ', $product->regular_interval);

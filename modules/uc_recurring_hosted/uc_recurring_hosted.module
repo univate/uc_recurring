@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_hosted.module,v 1.1.2.15 2010/07/31 13:42:30 univate Exp $
+// $Id: uc_recurring_hosted.module,v 1.1.2.16 2010/09/10 07:22:10 univate Exp $
 
 /**
  * @file
@@ -8,6 +8,8 @@
  */
 
 define('UC_PAYPAL_RECURRING_API', '63.0');
+
+define('UC_RECURRING_FEE_STATUS_SUSPENDED_NOPROFILE', 20);
 
 /******************************************************************************
  * DRUPAL HOOKS
@@ -242,6 +244,14 @@ function uc_recurring_hosted_recurring_access($fee, $op, $account){
     }
   }
 }
+
+/**
+ * Add a status label for "suspended (no agreement)"
+ */
+function uc_recurring_hosted_uc_recurring_status_alter(&$labels) {
+  $labels[UC_RECURRING_FEE_STATUS_SUSPENDED_NOPROFILE] = t('Suspended (no agreement)');
+}
+
 
 /******************************************************************************
  * AUTHORIZE.NET ARB

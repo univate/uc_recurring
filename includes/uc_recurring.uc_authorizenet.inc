@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.uc_authorizenet.inc,v 1.1.2.1 2010/06/08 16:03:57 univate Exp $
+// $Id: uc_recurring.uc_authorizenet.inc,v 1.1.2.2 2010/09/02 11:08:31 univate Exp $
 
 /**
  * @file
@@ -24,14 +24,14 @@ function uc_recurring_uc_authorizenet_recurring_info() {
       'update' => array(
         'title' => 'Update Account Details',
         'page arguments' => array('uc_recurring_authorizenet_cim_update_form'),
-        'file' => 'modules/uc_recurring.uc_authorizenet.inc',
+        'file' => 'includes/uc_recurring.uc_authorizenet.inc',
       ),
       'profile' => array(
         'title' => 'CIM Profile',
         'page arguments' => array('uc_recurring_authorizenet_cim_profile_form'),
         'access callback' => 'user_access',
         'access arguments' => array('administer recurring fees'),
-        'file' => 'modules/uc_recurring.uc_authorizenet.inc',
+        'file' => 'includes/uc_recurring.uc_authorizenet.inc',
       ),
       'cancel' => UC_RECURRING_MENU_DEFAULT,
     ), // Use the default user operation defined in uc_recurring.

@@ -1,70 +1,65 @@
 <?php
-// $Id: uc_recurring.admin.inc,v 1.1.4.18 2010/07/08 08:06:47 univate Exp $
+// $Id: uc_recurring.admin.inc,v 1.1.4.20 2010/09/10 12:08:58 univate Exp $
 
 /**
  * @file
- * Recurring payments administration menu items.
- *
+ * Recurring payments administration page callbacks and form builder functions.
  */
 
-// Displays a table for the administration of recurring fees.
-function uc_recurring_admin() {
+/**
+ * Displays a table for the administration of recurring fees.
+ */
+function uc_recurring_admin($filter = NULL, $id = NULL) {
   $item = menu_get_item();
 
+  // Add the filter form to the top of the table.
+  $output .= drupal_get_form('uc_recurring_admin_filter_form', $item);
+
+  // Build an array of fees to include in the admin table.
   $fees = array();
 
+  $footer_link = TRUE;
+
   $header = array(
-    array('data' => t('ID'), 'field' => 'rfid'),
-    array('data' => t('Order'), 'field' => 'order_id'),
+    array('data' => t('ID'), 'field' => 'ru.rfid'),
+    array('data' => t('Order'), 'field' => 'ru.order_id'),
+    array('data' => t('Status'), 'field' => 'ru.status'),
+    array('data' => t('Account')),
+    array('data' => t('Next'), 'field' => 'ru.next_charge', 'sort' => 'asc'),
     array('data' => t('Amount')),
-    array('data' => t('Next'), 'field' => 'next_charge', 'sort' => 'asc'),
     array('data' => t('Interval')),
     array('data' => t('Left')),
     array('data' => t('Total')),
     array('data' => t('Operations')),
   );
 
-  if (empty($item['map']['5'])) {
+  // If we're on the overview page listing all fees...
+  if (empty($filter)) {
     // Get all recurring fees in the system.
     $order = tablesort_sql($header);
-    $fees= uc_recurring_get_all_fees(TRUE, $order);
+    $fees = uc_recurring_get_all_fees(TRUE, $order);
+    $footer_link = FALSE;
   }
-  elseif ($item['map']['5'] == 'order') {
-    // Get all recurring fees in an order.
-    $order = uc_order_load($item['map']['6']);
-    $fees = uc_recurring_get_fees($order);
+  elseif ($filter == 'order') {
+    // Get all recurring fees in a specific order if it is valid.
+    if ($order = uc_order_load($id)) {
+      $fees = uc_recurring_get_fees($order);
+    }
   }
-  elseif ($fee = uc_recurring_fee_user_load($item['map'][6])) {
-    // Get single recurring fee.
+  elseif ($fee = uc_recurring_fee_user_load($id)) {
+    // Get a single recurring fee.
     $fees[] = $fee;
   }
 
-  $output = drupal_get_form('uc_recurring_admin_filter_form', $item);
-  if ($fees) {
-    $context = array(
-      'revision' => 'themed-original',
-      'location' => 'recurring-admin',
-    );
-
-    foreach ($fees as $fee) {
-      $ops = uc_recurring_get_fee_ops('fee_admin', $fee);
-      $rows[] = array(
-        l($fee->rfid, 'admin/store/orders/recurring/view/fee/'. $fee->rfid),
-        l($fee->order_id, 'admin/store/orders/'. $fee->order_id),
-        $fee->fee_amount != '0.00' ? uc_price($fee->fee_amount, $context) : t('Same as product price'),
-        format_date($fee->next_charge, 'small'),
-        array('data' => check_plain($fee->regular_interval), 'nowrap' => 'nowrap'),
-        $fee->remaining_intervals < 0 ? t('Until cancelled') : $fee->remaining_intervals,
-        $fee->remaining_intervals < 0 ? $fee->charged_intervals : $fee->remaining_intervals + $fee->charged_intervals,
-        array('data' => implode(' ', $ops), 'nowrap' => 'nowrap'),
-      );
-    }
-
-    $output .= theme('table', $header, $rows);
-    $output .= theme('pager', NULL, variable_get('uc_order_number_displayed', 30), 0);
-
+  // If we actually found fees to display...
+  if (!empty($fees)) {
+    $output .= theme('uc_recurring_admin_table', $fees);
   }
-  $output .= l(t('Back to the full list'), 'admin/store/orders/recurring');
+
+  // Display a link back to the full list if necessary.
+  if ($footer_link) {
+    $output .= l(t('Back to the full list'), 'admin/store/orders/recurring');
+  }
 
   return $output;
 }
@@ -407,4 +402,46 @@ function uc_recurring_payment_form_save_extensions($form, &$form_state) {
   if ($form_state['values']['submit'] == t('Save configuration')) {
     uc_recurring_save_extensions($form_state['values']['edit_extensions']);
   }
+}
+
+/**
+ * Display recurring information about this order.
+ */
+function uc_recurring_order_information($order_id) {
+  $order = uc_order_load($order_id);
+
+  $order_id = db_result(db_query("SELECT original_order_id FROM {uc_recurring_orders} WHERE renewal_order_id = %d", $order_id));
+  if (!empty($order_id)) {
+    $order = uc_order_load($order_id);
+  }
+
+  // Recurring fee details.
+  if (!empty($order)) {
+    $fees = uc_recurring_get_fees($order);
+    $output .= '<h2>'. t('Original order ID: @order_id', array('@order_id' => $order->order_id)) .'</h2>';
+    $output .= theme('uc_recurring_admin_table', $fees);
+
+    $header = array(
+      array('data' => t('Actions')),
+      array('data' => t('Order ID'), 'field' => 'o.order_id', 'sort' => 'desc'),
+      array('data' => t('Customer')),
+      array('data' => t('Total'), 'align' => 'center', 'field' => 'o.order_total'),
+      array('data' => t('Purchase date'), 'align' => 'center', 'field' => 'o.created'),
+      array('data' => t('Status'), 'field' => 'os.title'),
+    );
+
+    $output .= '<h2>'. t('Renewals') .'</h2>';
+    module_load_include('inc', 'uc_order', 'uc_order.admin');
+    $sql = 'SELECT o.order_id, o.uid, o.billing_first_name, o.billing_last_name, o.order_total, o.order_status, o.created, os.title
+            FROM {uc_orders} o
+              LEFT JOIN {uc_order_statuses} os ON o.order_status = os.order_status_id
+              LEFT JOIN {uc_recurring_orders} ro ON ro.renewal_order_id=o.order_id
+            WHERE ro.original_order_id = %d '. tablesort_sql($header);
+    $output .= uc_order_admin($sql, array($order->order_id), TRUE);
+  }
+  else {
+    $output = t('No recurring fees associated with this order');
+  }
+
+  return $output;
 }

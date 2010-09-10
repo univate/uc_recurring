@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.install,v 1.1.4.13 2010/06/18 01:36:46 univate Exp $
+// $Id: uc_recurring.install,v 1.1.4.14 2010/09/10 12:08:58 univate Exp $
 
 /**
  * @file
@@ -139,6 +139,25 @@ function uc_recurring_schema() {
       ),
     ),
     'primary key' => array('rfid'),
+  );
+  $schema['uc_recurring_orders'] = array(
+    'description' => t('Data for handling recurring relationships between orders.'),
+    'fields' => array(
+      'original_order_id' => array(
+        'description' => t('The original order ID.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'renewal_order_id' => array(
+        'description' => t('The recurring order ID.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
   );
   $schema['uc_recurring_schedule'] = array(
     'description' => t('Data for handling more complex recurring schedules.'),
@@ -429,9 +448,9 @@ function uc_recurring_update_6006() {
  */
 function uc_recurring_update_6007() {
   $ret = array();
-  
+
   db_add_field($ret, 'uc_recurring_users', 'status', array('description' => 'The status of the recurring fee, e.g. "active" or "expired"', 'type' => 'int', 'not null' => TRUE, 'default' => 0));
-  
+
   return $ret;
 }
 
@@ -440,9 +459,9 @@ function uc_recurring_update_6007() {
  */
 function uc_recurring_update_6008() {
   $ret = array();
-  
+
   $ret[] = update_sql("UPDATE {uc_recurring_extensions} set rebill_attempt=rebill_attempt-1");
-  
+
   return $ret;
 }
 
@@ -482,5 +501,43 @@ function uc_recurring_update_6011() {
   db_add_field($ret, 'uc_recurring_users', 'module', array('type' => 'varchar', 'length' => '255', 'not null' => TRUE, 'default' => ''));
   $ret[] = update_sql("UPDATE {uc_recurring_users} SET module = 'uc_recurring_order' WHERE data LIKE '%uc_recurring_order%'");
   $ret[] = update_sql("UPDATE {uc_recurring_users} SET module = 'uc_recurring_product' WHERE module = ''");
+  return $ret;
+}
+
+/**
+ * Add another table to track order relationships.
+ */
+function uc_recurring_update_6012() {
+  $ret = array();
+  $recurring_order_table = array(
+    'fields' => array(
+      'original_order_id' => array(
+        'description' => t('The original order ID.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'renewal_order_id' => array(
+        'description' => t('The recurring order ID.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+  );
+  db_create_table($ret, 'uc_recurring_orders', $recurring_order_table);
+
+  // Load all the recurring fees and build the uc_recurring_orders table from data found.
+  $result = db_query("SELECT * from {uc_recurring_users}");
+  while ($row = db_fetch_object($result)) {
+    $row->data = unserialize($row->data);
+    if (!empty($row->data['recurring orders'])) {
+      foreach ($row->data['recurring orders'] as $order_id => $order) {
+        db_query("INSERT INTO {uc_recurring_orders} (original_order_id, renewal_order_id) VALUES (%d, %d)", $row->order_id, $order_id);
+      }
+    }
+  }
   return $ret;
 }
