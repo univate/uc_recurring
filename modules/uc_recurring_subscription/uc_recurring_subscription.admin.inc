@@ -97,6 +97,7 @@ function uc_recurring_subscription_product_form($form_state, $product_id = NULL)
   drupal_add_css(drupal_get_path('module', 'uc_recurring_subscription') .'/uc_recurring_subscription.css');
 
   $form = array();
+  $products = array();
   if (isset($product_id)) {
     $form['product_id'] = array(
       '#type' => 'hidden',
@@ -550,8 +551,10 @@ function uc_recurring_subscription_product_form_submit(&$form, &$form_state) {
           $subscription->nid = $node->nid;
           $subscription->new = TRUE;
         }
-        foreach ($form_state['values']['access'][0] as $access => $value) {
-          $subscription->access[$access] = $value;
+        if (!empty($form_state['values']['access'][0])) {
+          foreach ($form_state['values']['access'][0] as $access => $value) {
+            $subscription->access[$access] = $value;
+          }
         }
         $key = $subscription->new == TRUE ? NULL : 'nid';
         drupal_write_record('uc_recurring_subscription', $subscription, $key);
