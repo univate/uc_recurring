@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_product.module,v 1.1.2.6 2010/09/10 12:08:58 univate Exp $
+// $Id: uc_recurring_product.module,v 1.1.2.7 2010/09/13 03:31:34 univate Exp $
 
 /**
  * @file
@@ -533,7 +533,7 @@ function uc_recurring_product_fee_load($pfid) {
   $result = db_query("SELECT pfid, model, fee_amount, initial_charge, regular_interval, number_intervals
                       FROM {uc_recurring_product}
                       WHERE pfid = %d", $pfid);
-  $product = db_fetch_object($results);
+  $product = db_fetch_object($result);
 
   list($product->initial_charge_value, $product->initial_charge_unit) = explode(' ', $product->initial_charge);
   list($product->regular_interval_value, $product->regular_interval_unit) = explode(' ', $product->regular_interval);
