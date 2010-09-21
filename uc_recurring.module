@@ -634,7 +634,7 @@ function uc_recurring_get_recurring_info($key = '', $reset = FALSE) {
     // Normalize data array to be keyed by the fee handler name.
     $data = _uc_recurring_get_recurring_info_handlers($data);
 
-    drupal_alter('recurring_info_alter', $data);
+    drupal_alter('recurring_info', $data);
   }
 
   if (!empty($key)) {
