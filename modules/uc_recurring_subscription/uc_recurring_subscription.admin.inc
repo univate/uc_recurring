@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_subscription.admin.inc,v 1.1.2.3 2010/12/08 23:05:28 univate Exp $
+// $Id: uc_recurring_subscription.admin.inc,v 1.1.2.4 2011/02/10 07:53:56 univate Exp $
 
 /**
  * @file
@@ -667,8 +667,8 @@ function uc_recurring_subscription_subscriber_list($form_state, $product_id = -1
                         LEFT JOIN {uc_order_products} p ON p.order_product_id = u.order_product_id
                         LEFT JOIN {uc_recurring_subscription} s ON s.nid = p.nid
                         LEFT JOIN {node} n ON n.nid = p.nid
-                      WHERE u.remaining_intervals <> 0
-                      GROUP BY n.nid");
+                      WHERE u.status <> %d
+                      GROUP BY n.nid", UC_RECURRING_FEE_STATUS_EXPIRED);
 
   while ($subscribers = db_fetch_object($result)) {
     if (!isset($subscribers->title)) {
@@ -701,6 +701,7 @@ function uc_recurring_subscription_subscriber_list($form_state, $product_id = -1
       array('data' => t('Subscription Started'), 'field' => 'ru.created'),
       array('data' => t('Next Renewal'), 'field' => 'ru.next_charge'),
       array('data' => t('Price')),
+      array('data' => t('Status')),
       array('data' => t('Operations'))
     );
     $sql = "SELECT u.uid, u.name, ru.*, p.nid, p.title as product_title
@@ -709,7 +710,7 @@ function uc_recurring_subscription_subscriber_list($form_state, $product_id = -1
               LEFT JOIN {uc_order_products} p ON p.order_product_id = ru.order_product_id
               LEFT JOIN {uc_recurring_subscription} s ON s.nid = p.nid
               LEFT JOIN {node} n ON n.nid = p.nid
-            WHERE ru.remaining_intervals <> 0 AND n.nid = %d";
+            WHERE ru.status <> ". UC_RECURRING_FEE_STATUS_EXPIRED ." AND n.nid = %d";
 
     $sql .= tablesort_sql($header);
     $result = pager_query($sql, 20, 0, NULL, $product->nid);
@@ -721,7 +722,7 @@ function uc_recurring_subscription_subscriber_list($form_state, $product_id = -1
         'start' => format_date($account->created, 'small'),
         'next' => format_date($account->next_charge, 'small'),
         'price' => uc_price($account->fee_amount, array()),
-        //'status' => uc_recurring_state($account->status),
+        'status' => uc_recurring_fee_status_label($account->status),
         'ops' => implode(' | ', uc_recurring_get_fee_ops('user', $account))
       );
     }
