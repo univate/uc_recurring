@@ -1,5 +1,5 @@
 <?php
-// $Id$
+// $Id: uc_recurring_subscription.ca.inc,v 1.1.2.3 2010/12/08 23:05:28 univate Exp $
 
 /**
  * Implementation of hook_ca_entity().

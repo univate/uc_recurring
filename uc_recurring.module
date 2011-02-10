@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.module,v 1.1.4.86 2010/09/10 12:08:58 univate Exp $
+// $Id: uc_recurring.module,v 1.1.4.91 2011/01/13 04:10:26 univate Exp $
 
 /**
  * @file
@@ -233,11 +233,13 @@ function uc_recurring_recurring_info() {
  * to requests).
  */
 function uc_recurring_cron() {
-  $fail = $success = 0;
+  $start = time();
+  lock_acquire('uc_recurring_cron', 30);
 
   if (variable_get('uc_recurring_trigger_renewals', TRUE)) {
     $fees = uc_recurring_get_fees_for_renew();
     if (!empty($fees)) {
+      $fail = $success = 0;
       foreach ($fees as $fee) {
         if ($order_id = uc_recurring_renew($fee)) {
           $success++;
@@ -246,10 +248,14 @@ function uc_recurring_cron() {
           // payment attempted but failed
           $fail++;
         }
+        if ($start - time() > 1800) { // 30seconds
+          break;
+        }
       }
       watchdog('uc_recurring', '@success recurring fees processed successfully; @fail failed.', array('@success' => $success, '@fail' => $fail));
     }
   }
+  lock_release('uc_recurring_cron');
 
   $fees = uc_recurring_get_fees_for_expiration();
   if (!empty($fees)) {
@@ -1136,4 +1142,14 @@ function uc_recurring_set_intervals(&$fee) {
   $fee->charged_intervals++;
   $fee->attempts = 0;
   $fee->data['extension'] = 0;
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function uc_recurring_views_api() {
+  return array(
+    'api' => 2,
+    'path' => drupal_get_path('module', 'uc_recurring') . '/views',
+  );
 }

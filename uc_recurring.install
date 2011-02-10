@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.install,v 1.1.4.14 2010/09/10 12:08:58 univate Exp $
+// $Id: uc_recurring.install,v 1.1.4.19 2011/02/04 00:49:28 univate Exp $
 
 /**
  * @file
@@ -135,7 +135,7 @@ function uc_recurring_schema() {
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
-        'default' => '0',
+        'default' => '',
       ),
     ),
     'primary key' => array('rfid'),
@@ -495,7 +495,8 @@ function uc_recurring_update_6010() {
 function uc_recurring_update_6011() {
   $ret = array();
   drupal_install_modules(array('uc_recurring_product'));
-  $ret[] = update_sql("INSERT {uc_recurring_product} SELECT * FROM {uc_recurring_products}");
+  db_drop_field($ret, 'uc_recurring_products', 'nid');
+  $ret[] = update_sql("INSERT INTO {uc_recurring_product} SELECT * FROM {uc_recurring_products}");
   db_drop_table($ret, 'uc_recurring_products');
 
   db_add_field($ret, 'uc_recurring_users', 'module', array('type' => 'varchar', 'length' => '255', 'not null' => TRUE, 'default' => ''));

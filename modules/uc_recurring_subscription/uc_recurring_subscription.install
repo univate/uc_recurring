@@ -1,5 +1,5 @@
 <?php
-// $Id$
+// $Id: uc_recurring_subscription.install,v 1.1.2.5 2011/02/06 00:18:20 univate Exp $
 
 /**
  * @file
@@ -18,9 +18,9 @@ function uc_recurring_subscription_requirements($phase) {
     if (!function_exists('uc_attribute_load_multiple')) {
       $requirements['uc_recurring_subscription'] = array(
         'title' => $t('Subscription Manager'),
-        'value' => $t('Patch required to Ubercart.'),
+        'value' => $t('Need a newer version of Ubercart.'),
         'severity' => REQUIREMENT_ERROR,
-        'description' => $t('This module requires a patch to ubercart, read the <a href="@readme">README.txt</a>', array('@readme' => url(drupal_get_path('module', 'uc_recurring_subscription') .'/README.txt'))),
+        'description' => $t('This module requires a newer version of ubercart, read the <a href="@readme">README.txt</a>', array('@readme' => url(drupal_get_path('module', 'uc_recurring_subscription') .'/README.txt'))),
       );
     }
   }
@@ -112,7 +112,7 @@ function uc_recurring_subscription_enable() {
   $attribute->required = 1;
   $attribute->display = 1;
   $attribute->description = 'The subscription payment options';
-  uc_attribute_save(&$attribute);
+  uc_attribute_save($attribute);
   uc_attribute_subject_save($attribute, 'class', 'uc_recurring_subscription');
   variable_set('uc_recurring_subscription_attribute', $attribute->aid);
 }

@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring.uc_authorizenet.inc,v 1.1.2.2 2010/09/02 11:08:31 univate Exp $
+// $Id: uc_recurring.uc_authorizenet.inc,v 1.1.2.4 2010/12/08 23:05:27 univate Exp $
 
 /**
  * @file
