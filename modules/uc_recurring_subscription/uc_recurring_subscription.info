@@ -1,0 +1,9 @@
+; $Id: uc_recurring_subscription.info,v 1.1.2.4 2011/02/06 00:18:20 univate Exp $
+name = Subscription Manager
+description = Provides a Subscription Manager UI for paid membership features. Depends on Ubercart-6.x-2.5
+dependencies[] = uc_recurring
+dependencies[] = uc_recurring_product
+dependencies[] = uc_attribute
+package = Ubercart - recurring
+core = 6.x
+php = 5.0

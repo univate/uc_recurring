@@ -1,4 +1,4 @@
-; $Id: uc_recurring_mock_gateway.info,v 1.1.2.4 2010/08/26 03:55:19 univate Exp $
+; $Id: uc_recurring_mock_gateway.info,v 1.1.2.6 2010/12/08 23:05:28 univate Exp $
 name = Mock Recurring Gateway
 description = DO NOT ENABLE - Implements mock payment method functions to simulate payment processing for simpletests ONLY.
 dependencies[] = uc_payment

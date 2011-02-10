@@ -1,5 +1,5 @@
 <?php
-// $Id: uc_recurring_hosted.api.php,v 1.1.2.1 2009/12/19 04:16:49 univate Exp $
+// $Id: uc_recurring_hosted.api.php,v 1.1.2.3 2010/12/08 23:05:27 univate Exp $
 
 function hook_uc_recurring_hosted_subscription_alter(&$object) {
 
